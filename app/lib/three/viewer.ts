@@ -8,6 +8,10 @@ import { HotspotLayer } from "./hotspots";
 type ViewerCallbacks = {
   onLoading: (loading: boolean, progress: number) => void;
   onSelect: (hotspot: Hotspot | null) => void;
+  /** A tap that hit the organ but no labelled dot, in canvas CSS pixels. The
+   *  35 hotspots cover a fraction of each model, so this is where "what's this
+   *  bit?" comes from — the app has no answer, which is the whole point. */
+  onUnlabelledTap?: (point: { x: number; y: number }) => void;
 };
 
 const DOT_PIXELS = 34;
@@ -463,6 +467,9 @@ export class AnatomyViewer {
     if (wasDragging) return;
     const marker = this.hotspots.pick(event.offsetX, event.offsetY, this.camera, this.width, this.height);
     this.select(marker && marker.hotspot.id !== this.selectedId ? marker.hotspot.id : null);
+    // A miss used to only close the callout. Report it too, so an unlabelled spot
+    // can become a question instead of a dead tap.
+    if (!marker) this.callbacks.onUnlabelledTap?.({ x: event.offsetX, y: event.offsetY });
   };
 
   private onPointerLeave = () => {
@@ -496,6 +503,55 @@ export class AnatomyViewer {
 
   clearSelection() {
     this.select(null);
+  }
+
+  /**
+   * A still of what the viewer is showing, as a data URL.
+   *
+   * `preserveDrawingBuffer` is deliberately left off — turning it on costs every
+   * frame, forever, for something used occasionally, and a plain `toDataURL()` on
+   * the live canvas returns a valid PNG of nothing because the buffer is cleared
+   * once the frame is composited. Rendering and copying inside a single task runs
+   * before that clear, so the pixels are still there.
+   *
+   * `mark` is a point in canvas pixels — where the child tapped. Ringing it in the
+   * image itself beats describing coordinates in words: whatever reads the picture
+   * can see exactly what is being asked about.
+   */
+  capture(options: { maxPx?: number; mark?: { x: number; y: number } } = {}): string | null {
+    const { maxPx = 512, mark } = options;
+    const source = this.renderer.domElement;
+    if (!source.width || !source.height) return null;
+
+    this.renderer.render(this.scene, this.camera);
+
+    const scale = Math.min(1, maxPx / Math.max(source.width, source.height));
+    const out = document.createElement("canvas");
+    out.width = Math.max(1, Math.round(source.width * scale));
+    out.height = Math.max(1, Math.round(source.height * scale));
+    const ctx = out.getContext("2d");
+    if (!ctx) return null;
+
+    // The renderer is created with `alpha: true`, so the frame is transparent
+    // where there is no organ. Left alone that becomes black in a JPEG; painting
+    // the app's own paper colour first keeps the still looking like the app.
+    ctx.fillStyle = "#fbf6ee";
+    ctx.fillRect(0, 0, out.width, out.height);
+    ctx.drawImage(source, 0, 0, out.width, out.height);
+
+    if (mark) {
+      const ratio = out.width / source.width;
+      // `mark` arrives in CSS pixels; the drawing buffer is scaled by the device
+      // pixel ratio, so it has to go through that before the downscale.
+      const dpr = source.width / this.width;
+      ctx.beginPath();
+      ctx.arc(mark.x * dpr * ratio, mark.y * dpr * ratio, Math.max(8, 16 * ratio), 0, Math.PI * 2);
+      ctx.lineWidth = Math.max(2, 3 * ratio);
+      ctx.strokeStyle = "#eb7c6b";
+      ctx.stroke();
+    }
+
+    return out.toDataURL("image/jpeg", 0.82);
   }
 
   /** The callout is positioned imperatively so tracking a spinning model never

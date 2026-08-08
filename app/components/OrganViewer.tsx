@@ -76,6 +76,14 @@ export function OrganViewer({ organ, autoRotate, onAutoRotate, compare, onCompar
         },
       });
       viewerRef.current = viewer;
+      // Local-only handle, alongside the existing /__debug surface. `capture()` is
+      // otherwise unreachable from outside this component, which makes the one
+      // thing worth checking by hand — that a still comes out non-blank — hard to
+      // check. A hostname test rather than a build flag, because `types` is pinned
+      // to workers-types and `import.meta.env` isn't typed here.
+      if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
+        (window as unknown as { __anatomyViewer?: AnatomyViewer }).__anatomyViewer = viewer;
+      }
       viewer.setAutoRotate(autoRotateRef.current);
       const current = organRef.current;
       viewer.setOrgan(current.model, current.hotspots, current.accent).catch(() => {
