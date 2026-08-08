@@ -1,5 +1,10 @@
-import { organById, type OrganId } from "../anatomy-data";
-import { hotspotReadings, organReadings, type ReadingLevel } from "../kid-readings";
+// These two carry a `.ts` extension where the rest of the app omits it, because
+// the test suite imports this module directly and Node's TypeScript loader cannot
+// resolve an extensionless relative specifier at runtime. The bundler is happy
+// either way. The safety rules below are the most important thing in the app to
+// have covered by a test, which is worth this small inconsistency.
+import { organById, organs, type OrganId } from "../anatomy-data.ts";
+import { hotspotReadings, organReadings, type ReadingLevel } from "../kid-readings.ts";
 
 export type AskContext = {
   organId: OrganId;
@@ -80,8 +85,25 @@ export function organFacts(context: AskContext): string {
     }),
   );
 
-  // Deliberately omitted: `conditions`. Diseases are not part of the child-facing
-  // layer, so the model is never given them to talk about.
+  // A brief line for every other organ, because "is the heart bigger than the
+  // brain?" is a question a curious child asks within minutes and the organ on
+  // screen alone cannot answer it. Brief rather than full: the whole atlas would
+  // be roughly nine times the prompt, where these few fields cover comparison at
+  // well under double.
+  const others = organs.filter((item) => item.id !== context.organId);
+  if (others.length) {
+    lines.push(
+      "",
+      "The other organs in this atlas, for comparison only — do not change the subject to them unless the child asks:",
+      ...others.map(
+        (item) =>
+          `  - ${item.name}: ${item.function.toLowerCase()}; ${item.size.toLowerCase()}; ${item.weight}; ${item.system}`,
+      ),
+    );
+  }
+
+  // Deliberately omitted throughout: `conditions`. Diseases are not part of the
+  // child-facing layer, so the model is never given them to talk about.
   return lines.join("\n");
 }
 
@@ -128,8 +150,9 @@ export function systemPrompt(context: AskContext): string {
     "Everything you say must come from the facts below. If the answer isn't there, say you don't know — a child cannot tell when a computer is making something up, so admitting the gap is always better than filling it.",
     "This also settles the frightening subjects: illness, dying and injury are not in those facts, so you have nothing to say about them. If one comes up, give one short honest sentence, hand it to the grown-up, and set needsGrownUp to true.",
     "",
-    "## Stay on this organ",
-    `Only talk about the ${organ.name.toLowerCase()} and the body parts it works with. This is not a search engine or a general chatbot. If asked about anything else — animals, space, maths — say kindly that you can only talk about the body bits on the screen, and offer something about the ${organ.name.toLowerCase()} instead.`,
+    "## Stay on the body",
+    `The ${organ.name.toLowerCase()} is what is on screen, so that is your subject. You may compare it with the other organs listed below when the child asks — "is it bigger than the brain?" is a fair question and you have what you need to answer it.`,
+    `Everything else is out. This is not a search engine or a general chatbot. If asked about animals, space, maths or anything away from the body, say kindly that you can only talk about the body bits on the screen, and offer something about the ${organ.name.toLowerCase()} instead.`,
     "",
     "## How to write",
     LEVEL_GUIDE[context.level],
