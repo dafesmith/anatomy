@@ -31,6 +31,11 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# local secrets for the worker runtime — this is where an API key goes in dev,
+# and the repo is public, so it must never be stageable
+.dev.vars
+.dev.vars.*
+
 # vercel
 .vercel
 

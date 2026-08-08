@@ -138,10 +138,39 @@ export function GrownUpSettings({ onClose }: Props) {
                 />
               </label>
 
-              <p className="grownup-note">
-                When the “ask a question” feature is built, its controls appear here too — off until
-                you turn them on.
-              </p>
+              <label className="grownup-toggle">
+                <span>
+                  <b>Let them ask questions</b>
+                  <small>
+                    A child can ask about the organ on screen and hear the answer. Only ever about
+                    what is on the screen — never about symptoms or illness.
+                  </small>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={settings.askEnabled}
+                  onChange={(event) => update({ askEnabled: event.target.checked })}
+                />
+              </label>
+
+              {/* Only shown once asking is on, because on its own it controls nothing —
+                  a disabled toggle for a feature that is itself off reads as broken. */}
+              {settings.askEnabled && (
+                <label className="grownup-toggle grownup-toggle-nested">
+                  <span>
+                    <b>Allow typing</b>
+                    <small>
+                      Off means the suggested buttons only, which is safer and easier for a younger
+                      child. On lets them type their own question.
+                    </small>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={settings.freeTypingEnabled}
+                    onChange={(event) => update({ freeTypingEnabled: event.target.checked })}
+                  />
+                </label>
+              )}
 
               {/* Said plainly rather than buried: a parent who thinks this is a real
                   lock will trust it further than it deserves. */}

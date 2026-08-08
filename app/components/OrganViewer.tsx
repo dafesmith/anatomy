@@ -26,9 +26,21 @@ type Props = {
   compare: boolean;
   onCompare: () => void;
   level: ReadingLevel;
+  /** Off unless a grown-up allowed it, so no asking affordance appears at all. */
+  askEnabled: boolean;
+  onAsk: (start: { hotspotId?: string; unlabelled?: boolean; image?: string }) => void;
 };
 
-export function OrganViewer({ organ, autoRotate, onAutoRotate, compare, onCompare, level }: Props) {
+export function OrganViewer({
+  organ,
+  autoRotate,
+  onAutoRotate,
+  compare,
+  onCompare,
+  level,
+  askEnabled,
+  onAsk,
+}: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<AnatomyViewer | null>(null);
   const organRef = useRef(organ);
@@ -38,6 +50,9 @@ export function OrganViewer({ organ, autoRotate, onAutoRotate, compare, onCompar
   const [progress, setProgress] = useState(0);
   const [slowLoad, setSlowLoad] = useState(false);
   const [activeTool, setActiveTool] = useState<string | null>(null);
+  /** Where a tap landed that hit no label — the prompt for "what's this bit?". */
+  const [bareTap, setBareTap] = useState<{ x: number; y: number } | null>(null);
+  const askEnabledRef = useRef(askEnabled);
   const { supported: canSpeak, speakingId, speak, stop: stopSpeaking } = useSpeech(level);
   const kidLine = selected ? hotspotReading(organ.id, selected.id, level) : null;
   // Keyed per hotspot so re-opening a different dot doesn't inherit the previous
@@ -61,6 +76,13 @@ export function OrganViewer({ organ, autoRotate, onAutoRotate, compare, onCompar
     autoRotateRef.current = autoRotate;
   }, [autoRotate]);
 
+  // The viewer is constructed once, so its callback reads this ref rather than
+  // closing over a stale `askEnabled` from the first render. Nothing needs
+  // clearing when permission is revoked — the render already gates on it.
+  useEffect(() => {
+    askEnabledRef.current = askEnabled;
+  }, [askEnabled]);
+
   useEffect(() => {
     let cancelled = false;
     let viewer: AnatomyViewer | null = null;
@@ -68,11 +90,18 @@ export function OrganViewer({ organ, autoRotate, onAutoRotate, compare, onCompar
     void import("../lib/three/viewer").then(({ AnatomyViewer: Viewer }) => {
       if (cancelled || !mountRef.current) return;
       viewer = new Viewer(mountRef.current, {
-        onSelect: setSelected,
+        onSelect: (hotspot) => {
+          setSelected(hotspot);
+          // Opening a label answers the question, so the bare-tap prompt goes.
+          if (hotspot) setBareTap(null);
+        },
         onLoading: (isLoading, value) => {
           setLoading(isLoading);
           setProgress(value);
           if (isLoading) setSlowLoad(false);
+        },
+        onUnlabelledTap: (point) => {
+          if (askEnabledRef.current) setBareTap(point);
         },
       });
       viewerRef.current = viewer;
@@ -197,8 +226,37 @@ export function OrganViewer({ organ, autoRotate, onAutoRotate, compare, onCompar
                 {speakingId === calloutSpeechId ? <Square size={13} /> : <Volume2 size={13} />}
               </button>
             )}
+            {askEnabled && (
+              <button
+                type="button"
+                className="callout-ask"
+                onClick={() => onAsk({ hotspotId: selected.id })}
+              >
+                Tell me more
+              </button>
+            )}
           </div>
         </div>
+      )}
+
+      {/* A tap that found no label. The capture is taken here, at the moment of
+          the tap, because by the time the question is sent the organ may have
+          rotated and the ring would point at the wrong thing. */}
+      {askEnabled && bareTap && !selected && (
+        <button
+          type="button"
+          className="bare-tap-ask"
+          style={{ left: bareTap.x, top: bareTap.y }}
+          onClick={() => {
+            onAsk({
+              unlabelled: true,
+              image: viewerRef.current?.capture({ mark: bareTap }) ?? undefined,
+            });
+            setBareTap(null);
+          }}
+        >
+          What&rsquo;s this bit?
+        </button>
       )}
 
       {/* Screen-reader equivalent of the dots, which live in the canvas. */}

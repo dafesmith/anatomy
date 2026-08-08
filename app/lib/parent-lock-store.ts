@@ -24,13 +24,31 @@ import { readLocal, writeLocal } from "./local-store";
 export type ParentSettings = {
   /** The 72 clinical conditions, hidden while a kid reading level is active. */
   showConditions: boolean;
+  /** Asking questions at all. Off until a grown-up turns it on. */
+  askEnabled: boolean;
+  /**
+   * Whether a child may type freely, or only use the suggested buttons.
+   *
+   * Buttons-only is the safer default and also the more usable one for a young
+   * child, who can tap but not type. It is a real safety boundary rather than a
+   * preference: with no text box there is nothing to type a symptom into.
+   */
+  freeTypingEnabled: boolean;
 };
 
 const PIN_KEY = "anatomy-atelier:parent-pin:v1";
 const SETTINGS_KEY = "anatomy-atelier:parent-settings:v1";
 
-/** Safe by default: a fresh install hides the conditions with no PIN ever set. */
-const DEFAULTS: ParentSettings = { showConditions: false };
+/**
+ * Safe by default. A fresh install hides the conditions, cannot ask questions, and
+ * has no text box — with no PIN ever set. The defaults do the protecting, because
+ * most parents will never open this panel.
+ */
+const DEFAULTS: ParentSettings = {
+  showConditions: false,
+  askEnabled: false,
+  freeTypingEnabled: false,
+};
 
 type StoredPin = { salt: string; hash: string };
 
@@ -54,8 +72,15 @@ function readPin(): StoredPin | null {
 function readSettings(): ParentSettings {
   const stored = readLocal(SETTINGS_KEY);
   if (!stored || typeof stored !== "object") return DEFAULTS;
-  const { showConditions } = stored as ParentSettings;
-  return { showConditions: showConditions === true };
+  // Each flag must be explicitly `true` to count. A settings blob written by an
+  // older version simply lacks the newer keys, and those default to off rather
+  // than to on — the safe direction for a setting a parent hasn't seen yet.
+  const saved = stored as Partial<ParentSettings>;
+  return {
+    showConditions: saved.showConditions === true,
+    askEnabled: saved.askEnabled === true,
+    freeTypingEnabled: saved.freeTypingEnabled === true,
+  };
 }
 
 // ---------------------------------------------------------------------------

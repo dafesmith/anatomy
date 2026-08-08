@@ -528,6 +528,23 @@ button.organ-card-image:focus-visible { outline: 2px solid #8b6fc4; outline-offs
 }
 .reading-picker button.active { background: rgba(142,109,197,.11); border-color: rgba(142,109,197,.34); color: #6d568f; }
 
+.voice-picker { margin: 8px 0 2px; }
+.voice-picker label { display: flex; align-items: center; gap: 9px; }
+.voice-picker span { color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: .1em; }
+.voice-picker select {
+  flex: 1;
+  max-width: 260px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255,255,255,.5);
+  color: var(--ink);
+  font: 500 11px var(--font-serif), serif;
+  cursor: pointer;
+}
+.voice-picker p { margin: 6px 0 0; color: var(--muted); font: 500 10px/1.45 var(--font-serif), serif; }
+
 .description-row, .facts-heading { display: flex; align-items: flex-start; gap: 10px; }
 .facts-heading { align-items: center; justify-content: space-between; }
 .facts-heading h2 { margin: 17px 0 10px; }
@@ -636,6 +653,128 @@ button.organ-card-image:focus-visible { outline: 2px solid #8b6fc4; outline-offs
 .app-shell[data-reading="simple"] .quiz-option { font-size: 15px; }
 .app-shell[data-reading="simple"] .quiz-prompt p { font-size: 18px; }
 
+/* ---- Ask a question ----------------------------------------------------- */
+/* Anchored at the bottom rather than shown as a dialog: the child has to keep
+   seeing the organ while talking about it, and a modal would cover it. Follows
+   the same pattern as .compare-strip. */
+.ask-panel {
+  position: fixed;
+  z-index: 30;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  width: min(560px, calc(100% - 24px));
+  max-height: min(62vh, 520px);
+  display: flex;
+  flex-direction: column;
+  padding: 13px 15px 14px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: rgba(255,251,245,.97);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 22px 60px rgba(64,43,29,.2);
+}
+.ask-panel > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; flex: none; }
+.ask-panel > header em { display: block; color: var(--lavender); font-style: normal; font-size: 9px; text-transform: uppercase; letter-spacing: .12em; }
+.ask-panel > header b { display: block; margin-top: 3px; font: 500 17px var(--font-serif), serif; }
+.ask-panel > header button { border: 0; background: transparent; color: var(--muted); cursor: pointer; }
+.ask-stub-note {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: rgba(198,154,94,.12);
+  color: #86663c;
+  font: 500 11px/1.4 var(--font-serif), serif;
+}
+.ask-messages { margin: 11px 0 0; overflow: auto; scrollbar-width: none; display: flex; flex-direction: column; gap: 9px; }
+.ask-empty { margin: 4px 0; color: var(--muted); font: 500 12px var(--font-serif), serif; }
+.ask-question {
+  margin: 0;
+  align-self: flex-end;
+  max-width: 80%;
+  padding: 8px 12px;
+  border-radius: 14px 14px 4px 14px;
+  background: rgba(142,109,197,.11);
+  color: #5d4a7d;
+  font: 500 13px/1.45 var(--font-serif), serif;
+}
+.ask-answer { position: relative; align-self: flex-start; max-width: 88%; padding: 10px 40px 10px 12px; border-radius: 14px 14px 14px 4px; background: rgba(255,255,255,.72); border: 1px solid var(--line); }
+.ask-answer p { margin: 0; font: 500 14px/1.5 var(--font-serif), serif; }
+.ask-answer .speak-button { position: absolute; right: 7px; top: 7px; width: 26px; height: 26px; }
+/* A flagged answer must not look like the others, or the signal is lost. */
+.ask-answer.grown-up { background: rgba(198,154,94,.13); border-color: rgba(198,154,94,.4); }
+.ask-grownup-flag { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; color: #86663c; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+.ask-thinking { display: flex; align-items: center; gap: 7px; margin: 0; color: var(--muted); font: 500 12px var(--font-serif), serif; }
+.ask-thinking svg { animation: orbit 1.6s linear infinite; }
+.ask-error { margin: 9px 0 0; color: #b4614f; font: 500 12px var(--font-serif), serif; }
+.ask-suggestions { flex: none; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 11px; }
+.ask-suggestions button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: rgba(255,255,255,.5);
+  cursor: pointer;
+  font: 500 11px var(--font-serif), serif;
+}
+.ask-suggestions button:hover:enabled { background: #fff; }
+.ask-suggestions button:disabled { opacity: .5; cursor: default; }
+.ask-compose { flex: none; display: flex; gap: 8px; margin-top: 10px; }
+.ask-compose input {
+  flex: 1;
+  height: 40px;
+  padding: 0 13px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: rgba(255,255,255,.6);
+  color: var(--ink);
+  font: 500 13px var(--font-serif), serif;
+}
+.ask-compose button {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 11px;
+  background: linear-gradient(110deg, #ed8a72, #e87868);
+  color: #fff;
+  cursor: pointer;
+}
+.ask-compose button:disabled { opacity: .45; cursor: default; }
+
+.callout-ask {
+  display: block;
+  width: calc(100% - 26px);
+  margin: 8px 0 0 13px;
+  min-height: 26px;
+  border: 1px solid rgba(142,109,197,.34);
+  border-radius: 8px;
+  background: rgba(142,109,197,.09);
+  color: #6d568f;
+  cursor: pointer;
+  font: 500 11px var(--font-serif), serif;
+}
+/* Sits at the tap point, so it reads as "this thing you just touched". */
+.bare-tap-ask {
+  position: absolute;
+  z-index: 8;
+  transform: translate(-50%, -50%);
+  padding: 7px 12px;
+  border: 1px solid rgba(215,112,91,.34);
+  border-radius: 99px;
+  background: rgba(255,251,245,.96);
+  color: #b4614f;
+  cursor: pointer;
+  font: 500 11px var(--font-serif), serif;
+  box-shadow: 0 6px 18px rgba(87,62,43,.16);
+  animation: callout-in .2s ease-out;
+}
+
 /* ---- Grown-up settings -------------------------------------------------- */
 .grown-up-panel { text-align: left; }
 .grown-up-panel .modal-icon { color: var(--lavender); background: rgba(142,109,197,.1); }
@@ -682,6 +821,9 @@ button.organ-card-image:focus-visible { outline: 2px solid #8b6fc4; outline-offs
 .grownup-toggle b { display: block; font: 500 14px var(--font-serif), serif; }
 .grownup-toggle small { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; line-height: 1.4; }
 .grownup-toggle input { flex: none; width: 20px; height: 20px; margin-top: 2px; accent-color: var(--lavender); }
+.grownup-toggle + .grownup-toggle { margin-top: 8px; }
+/* Indented to show it only applies while the setting above is on. */
+.grownup-toggle-nested { margin-left: 18px; background: rgba(255,255,255,.24); }
 .grownup-warning {
   display: flex;
   gap: 9px;
@@ -903,7 +1045,8 @@ button.organ-card-image:focus-visible { outline: 2px solid #8b6fc4; outline-offs
   /* The reading picker, the description row, the grown-up reveal and the facts
      heading are all new wrappers around what used to be bare children — they
      have to be named here or the grid auto-places them into column 1. */
-  .info-panel .reading-row, .info-panel .description-row, .info-panel .grown-up-copy,
+  .info-panel .reading-row, .info-panel .voice-picker,
+  .info-panel .description-row, .info-panel .grown-up-copy,
   .info-panel .rule, .info-panel .facts-heading, .key-facts, .medical-note { grid-column: 2; }
   .info-kicker, .info-title-row { grid-column: 1; }
   .info-panel { height: 330px; }

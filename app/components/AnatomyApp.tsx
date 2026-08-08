@@ -33,6 +33,7 @@ import { useFavorites } from "../lib/favorites-store";
 import { useReadingLevel } from "../lib/reading-level-store";
 import { useParentLock } from "../lib/parent-lock-store";
 import { GrownUpSettings } from "./GrownUpSettings";
+import { AskPanel } from "./AskPanel";
 import { useSpeech } from "../lib/use-speech";
 import { organDescription, type ReadingLevel } from "../lib/kid-readings";
 import { ReadingLevelPicker } from "./ReadingLevelPicker";
@@ -57,6 +58,7 @@ export function AnatomyApp() {
   const { level, choose: chooseLevel } = useReadingLevel();
   const { settings: parentSettings } = useParentLock();
   const [grownUpOpen, setGrownUpOpen] = useState(false);
+  const [asking, setAsking] = useState<{ hotspotId?: string; unlabelled?: boolean; image?: string } | null>(null);
   const { supported: canSpeak, speakingId, speak, stop: stopSpeaking } = useSpeech(level);
   const organ = organById[organId];
   const reference = organById[organId === "heart" ? "brain" : "heart"];
@@ -236,6 +238,8 @@ export function AnatomyApp() {
           compare={compare}
           onCompare={() => setCompare(!compare)}
           level={level}
+          askEnabled={parentSettings.askEnabled}
+          onAsk={setAsking}
         />
 
         <aside className="info-panel" ref={contentRef}>
@@ -394,6 +398,20 @@ export function AnatomyApp() {
 
       {view === "notes" && (
         <NotesView currentOrganId={organId} onSelectOrgan={openOrganFromIndex} />
+      )}
+
+      {/* Re-checks the setting on render, so revoking permission mid-conversation
+          closes the panel rather than leaving it live. */}
+      {asking && parentSettings.askEnabled && view === "explore" && (
+        <AskPanel
+          organ={organ}
+          hotspotId={asking.hotspotId}
+          level={level}
+          allowTyping={parentSettings.freeTypingEnabled}
+          unlabelled={asking.unlabelled}
+          image={asking.image}
+          onClose={() => setAsking(null)}
+        />
       )}
 
       {grownUpOpen && <GrownUpSettings onClose={() => setGrownUpOpen(false)} />}
