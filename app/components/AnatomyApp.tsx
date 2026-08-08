@@ -23,63 +23,39 @@ import {
   X,
 } from "lucide-react";
 import { OrganViewer } from "./OrganViewer";
-import { organById, organs, type Organ, type OrganId } from "../lib/anatomy-data";
+import { OrganArt } from "./OrganArt";
+import { SystemsIndex } from "./SystemsIndex";
+import { LibraryIndex } from "./LibraryIndex";
+import { NotesView } from "./NotesView";
+import { useFavorites } from "../lib/favorites-store";
+import { organById, organs, referenceIndex, systems, type Organ, type OrganId } from "../lib/anatomy-data";
 
 type Modal = "lesson" | "quiz" | "animation" | "system" | null;
-
-/**
- * Renders an organ illustration, or its accent glyph for organs that ship as a
- * 3D model without the painted asset set. Keeps every image slot filled instead
- * of leaving a broken `<img>` behind.
- */
-function OrganArt({
-  organ,
-  asset,
-  alt,
-  size,
-}: {
-  organ: Organ;
-  asset: "thumb" | "organ" | "microscopic" | "compare" | "location";
-  alt: string;
-  size?: number;
-}) {
-  if (!organ.illustrated) {
-    // An empty alt means a surrounding control already names this, so the
-    // glyph should be skipped rather than announced with no label.
-    const labelling = alt ? { role: "img", "aria-label": alt } : { "aria-hidden": true };
-    return (
-      <span className="art-fallback" style={{ "--art-accent": organ.accent } as React.CSSProperties} {...labelling}>
-        {organ.icon}
-      </span>
-    );
-  }
-  return (
-    <img
-      key={`${organ.id}-${asset}`}
-      src={`/anatomy/${organ.id}/${asset}.webp`}
-      alt={alt}
-      width={size}
-      height={size}
-      loading={asset === "thumb" ? "eager" : "lazy"}
-      decoding="async"
-    />
-  );
-}
+type View = "explore" | "systems" | "library" | "notes";
 
 export function AnatomyApp() {
   const [organId, setOrganId] = useState<OrganId>("heart");
+  const [view, setView] = useState<View>("explore");
   const [autoRotate, setAutoRotate] = useState(true);
   const [compare, setCompare] = useState(false);
   const [modal, setModal] = useState<Modal>(null);
   const [query, setQuery] = useState("");
   const [mobileLibrary, setMobileLibrary] = useState(false);
+  const [savedOnly, setSavedOnly] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const prefetched = useRef(new Set<OrganId>());
+  const { favorites, toggle: toggleFavorite } = useFavorites();
   const organ = organById[organId];
   const reference = organById[organId === "heart" ? "brain" : "heart"];
+  const saved = favorites.includes(organId);
   const filteredOrgans = useMemo(
-    () => organs.filter((item) => `${item.name} ${item.system}`.toLowerCase().includes(query.toLowerCase())),
-    [query],
+    () =>
+      organs.filter(
+        (item) =>
+          `${item.name} ${item.system}`.toLowerCase().includes(query.toLowerCase()) &&
+          (!savedOnly || favorites.includes(item.id)),
+      ),
+    [query, savedOnly, favorites],
   );
 
   useEffect(() => {
@@ -110,6 +86,23 @@ export function AnatomyApp() {
     void fetch(organById[id].model, { priority: "low" } as RequestInit).catch(() => {});
   };
 
+  // Shared by every index view. Clears any leftover filter so the organ library
+  // comes back whole around the organ just picked, rather than hiding it behind
+  // an earlier search term.
+  const openOrganFromIndex = (id: OrganId) => {
+    setQuery("");
+    selectOrgan(id);
+    setView("explore");
+  };
+
+  // The library filter already matches on `name` + `system`, so handing it the
+  // system name narrows the list to exactly that system — and leaves the term
+  // visible in the search box, which "View all organs" clears.
+  const filterBySystem = (system: string) => {
+    setQuery(system);
+    setView("explore");
+  };
+
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -117,12 +110,35 @@ export function AnatomyApp() {
           <strong>Anatomy Atelier<sup>✦</sup></strong>
           <em>Learn anatomy like an artist</em>
         </button>
+        {/* Every label carries an aria-label as well as visible text: the
+            narrow breakpoints hide the <span>, and hidden text is absent from
+            the accessibility tree, which would leave these buttons unnamed. */}
         <nav className="main-nav" aria-label="Primary navigation">
-          <button className="active"><Compass size={17} /> Explore</button>
-          <button><BrainCircuit size={17} /> Systems</button>
-          <button onClick={() => setModal("lesson")}><BookOpen size={17} /> Lessons</button>
-          <button><LibraryBig size={17} /> Library</button>
-          <button><NotebookPen size={17} /> Notes</button>
+          <button
+            className={view === "explore" ? "active" : ""}
+            aria-current={view === "explore" ? "page" : undefined}
+            aria-label="Explore"
+            onClick={() => setView("explore")}
+          ><Compass size={17} /> <span>Explore</span></button>
+          <button
+            className={view === "systems" ? "active" : ""}
+            aria-current={view === "systems" ? "page" : undefined}
+            aria-label="Systems"
+            onClick={() => setView("systems")}
+          ><BrainCircuit size={17} /> <span>Systems</span></button>
+          <button aria-label="Lessons" onClick={() => setModal("lesson")}><BookOpen size={17} /> <span>Lessons</span></button>
+          <button
+            className={view === "library" ? "active" : ""}
+            aria-current={view === "library" ? "page" : undefined}
+            aria-label="Library"
+            onClick={() => setView("library")}
+          ><LibraryBig size={17} /> <span>Library</span></button>
+          <button
+            className={view === "notes" ? "active" : ""}
+            aria-current={view === "notes" ? "page" : undefined}
+            aria-label="Notes"
+            onClick={() => setView("notes")}
+          ><NotebookPen size={17} /> <span>Notes</span></button>
         </nav>
         <label className="search-box">
           <Search size={17} />
@@ -132,12 +148,21 @@ export function AnatomyApp() {
         <button className="mobile-library-trigger" onClick={() => setMobileLibrary(true)} aria-label="Open organ library"><LibraryBig size={20} /></button>
       </header>
 
-      <div className="workspace">
+      {/* Hidden rather than unmounted: the viewer's own IntersectionObserver
+          idles the render loop while it is off-screen, so keeping it mounted
+          costs nothing and preserves both the WebGL context and the parsed
+          models already in the asset cache. */}
+      <div className="workspace" hidden={view !== "explore"}>
         <aside className={`organ-library ${mobileLibrary ? "open" : ""}`}>
           <div className="panel-heading">
             <span>Organ library</span>
             <button aria-label="Close library" className="mobile-close" onClick={() => setMobileLibrary(false)}><X size={17} /></button>
-            <button aria-label="Saved organs"><Bookmark size={17} /></button>
+            <button
+              className={savedOnly ? "active" : ""}
+              aria-pressed={savedOnly}
+              aria-label={savedOnly ? "Show all organs" : "Show only saved organs"}
+              onClick={() => setSavedOnly(!savedOnly)}
+            ><Bookmark size={17} fill={savedOnly ? "currentColor" : "none"} /></button>
           </div>
           <div className="organ-list">
             {filteredOrgans.map((item) => (
@@ -154,10 +179,23 @@ export function AnatomyApp() {
                   <OrganArt organ={item} asset="thumb" alt={`${item.name} thumbnail`} size={47} />
                 </span>
                 <span><b>{item.name}</b><small>{item.system}</small></span>
-                {organId === item.id && <Heart className="favorite" size={14} fill="currentColor" />}
+                <span className="organ-markers">
+                  {/* Saved state has to be announced — it isn't visible from the
+                      row's own label — while the selected dot only restates what
+                      `.organ-item.active` already shows visually. */}
+                  {favorites.includes(item.id) && (
+                    <Bookmark className="organ-saved" size={13} fill="currentColor" aria-label="Saved" role="img" />
+                  )}
+                  {organId === item.id && <span className="organ-selected" aria-hidden />}
+                </span>
               </button>
             ))}
           </div>
+          {savedOnly && filteredOrgans.length === 0 && (
+            <p className="organ-list-empty" role="status">
+              Nothing saved yet. Open an organ and choose <b>Save</b> to keep it here.
+            </p>
+          )}
           <button className="view-all" onClick={() => setQuery("")}>View all organs <ArrowRight size={14} /></button>
           <blockquote>
             <Sparkles size={18} />
@@ -200,11 +238,16 @@ export function AnatomyApp() {
             <button onClick={() => setModal("animation")}><Play size={15} /> Animate</button>
             <button onClick={() => setModal("quiz")}><CircleHelp size={15} /> Quiz</button>
             <button onClick={() => setCompare(!compare)} className={compare ? "active" : ""}><Share2 size={15} /> Compare</button>
+            <button
+              className={`action-save ${saved ? "active" : ""}`}
+              aria-pressed={saved}
+              onClick={() => void toggleFavorite(organId)}
+            ><Bookmark size={15} fill={saved ? "currentColor" : "none"} /> {saved ? "Saved" : "Save"}</button>
           </div>
         </aside>
       </div>
 
-      {compare && (
+      {compare && view === "explore" && (
         <section className="compare-strip" aria-label="Organ comparison">
           <div className="compare-organ"><OrganArt organ={organ} asset="thumb" alt="" /><span>Comparing</span><strong>{organ.name}</strong><small>{organ.system}</small></div>
           <b>vs.</b>
@@ -214,7 +257,7 @@ export function AnatomyApp() {
         </section>
       )}
 
-      <section className="learning-cards" aria-label={`${organ.name} learning resources`}>
+      <section className="learning-cards" hidden={view !== "explore"} aria-label={`${organ.name} learning resources`}>
         <article className="curiosity-card">
           <span>✿</span><p>Learning is<br />an act of curiosity.</p><em>Keep exploring!</em>
         </article>
@@ -262,6 +305,28 @@ export function AnatomyApp() {
           <button onClick={() => setModal("system")}>See the system <ArrowRight size={14} /></button>
         </article>
       </section>
+
+      {view === "systems" && (
+        <SystemsIndex
+          systems={systems}
+          activeOrganId={organId}
+          onSelectOrgan={openOrganFromIndex}
+          onPrefetchOrgan={prefetchOrgan}
+          onFilterSystem={filterBySystem}
+        />
+      )}
+
+      {view === "library" && (
+        <LibraryIndex
+          entries={referenceIndex}
+          onSelectOrgan={openOrganFromIndex}
+          onPrefetchOrgan={prefetchOrgan}
+        />
+      )}
+
+      {view === "notes" && (
+        <NotesView currentOrganId={organId} onSelectOrgan={openOrganFromIndex} />
+      )}
 
       {modal && <LearningModal type={modal} organ={organ} onClose={() => setModal(null)} />}
       {mobileLibrary && <button className="drawer-backdrop" aria-label="Close library" onClick={() => setMobileLibrary(false)} />}

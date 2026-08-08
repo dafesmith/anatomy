@@ -309,3 +309,48 @@ export const organs: Organ[] = [
 ];
 
 export const organById = Object.fromEntries(organs.map((organ) => [organ.id, organ])) as Record<OrganId, Organ>;
+
+export type ReferenceKind = "condition" | "tissue" | "comparison";
+
+export type ReferenceEntry = {
+  kind: ReferenceKind;
+  /** The indexed term itself — "Arrhythmia", "Cardiac muscle tissue", "Heart vs. brain". */
+  label: string;
+  organ: Organ;
+};
+
+/**
+ * Every condition, tissue, and comparison across `organs`, flattened into one
+ * alphabetical list that points back at the organ each term belongs to. These
+ * details are otherwise reachable only by opening one organ at a time, which
+ * makes them impossible to search across.
+ *
+ * Every condition string in the data is currently unique to a single organ, so
+ * an entry maps to exactly one organ rather than a list of them.
+ */
+export const referenceIndex: ReferenceEntry[] = organs
+  .flatMap((organ) => [
+    ...organ.conditions.map((label) => ({ kind: "condition" as const, label, organ })),
+    { kind: "tissue" as const, label: organ.tissue, organ },
+    { kind: "comparison" as const, label: organ.comparison, organ },
+  ])
+  .sort((a, b) => a.label.localeCompare(b.label));
+
+export type BodySystem = {
+  /** The `system` value shared by every organ in the group. */
+  name: string;
+  organs: Organ[];
+};
+
+/**
+ * `organs` regrouped by `system`, in the order each system first appears. Derived
+ * rather than hand-written so a new organ joins its system automatically, and an
+ * organ carrying a brand-new `system` string becomes its own group rather than
+ * silently vanishing from the systems index.
+ */
+export const systems: BodySystem[] = organs.reduce<BodySystem[]>((grouped, organ) => {
+  const existing = grouped.find((system) => system.name === organ.system);
+  if (existing) existing.organs.push(organ);
+  else grouped.push({ name: organ.system, organs: [organ] });
+  return grouped;
+}, []);

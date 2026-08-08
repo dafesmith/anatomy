@@ -41,3 +41,7 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+
+# claude code — machine-local settings and dev-server ports, not shared config
+.claude/settings.local.json
+.claude/launch.json
