@@ -19,7 +19,9 @@ import {
   Search,
   Share2,
   Sparkles,
+  Square,
   Stethoscope,
+  Volume2,
   X,
 } from "lucide-react";
 import { OrganViewer } from "./OrganViewer";
@@ -28,6 +30,13 @@ import { SystemsIndex } from "./SystemsIndex";
 import { LibraryIndex } from "./LibraryIndex";
 import { NotesView } from "./NotesView";
 import { useFavorites } from "../lib/favorites-store";
+import { useReadingLevel } from "../lib/reading-level-store";
+import { useParentLock } from "../lib/parent-lock-store";
+import { GrownUpSettings } from "./GrownUpSettings";
+import { useSpeech } from "../lib/use-speech";
+import { organDescription, type ReadingLevel } from "../lib/kid-readings";
+import { ReadingLevelPicker } from "./ReadingLevelPicker";
+import { QuizPanel } from "./QuizPanel";
 import { organById, organs, referenceIndex, systems, type Organ, type OrganId } from "../lib/anatomy-data";
 
 type Modal = "lesson" | "quiz" | "animation" | "system" | null;
@@ -45,9 +54,23 @@ export function AnatomyApp() {
   const contentRef = useRef<HTMLDivElement>(null);
   const prefetched = useRef(new Set<OrganId>());
   const { favorites, toggle: toggleFavorite } = useFavorites();
+  const { level, choose: chooseLevel } = useReadingLevel();
+  const { settings: parentSettings } = useParentLock();
+  const [grownUpOpen, setGrownUpOpen] = useState(false);
+  const { supported: canSpeak, speakingId, speak, stop: stopSpeaking } = useSpeech(level);
   const organ = organById[organId];
   const reference = organById[organId === "heart" ? "brain" : "heart"];
   const saved = favorites.includes(organId);
+  const description = organDescription(organId, organ.description, level);
+  // Diseases are hidden while a child level is on, unless a grown-up allowed them.
+  // At `original` the reader is an adult, so there is nothing to gate.
+  const conditionsHidden = level !== "original" && !parentSettings.showConditions;
+  const libraryEntries = conditionsHidden
+    ? referenceIndex.filter((entry) => entry.kind !== "condition")
+    : referenceIndex;
+  // Read as one passage rather than six clipped fragments, so it sounds like a
+  // sentence instead of a list being dictated.
+  const factsAloud = `${organ.name}. Size: ${organ.size}. Weight: ${organ.weight}. Every day: ${organ.dailyFact}. Where it is: ${organ.location}. What it does: ${organ.function}.`;
   const filteredOrgans = useMemo(
     () =>
       organs.filter(
@@ -73,6 +96,8 @@ export function AnatomyApp() {
         image.src = `/anatomy/${id}/${asset}.webp`;
       });
     }
+    // A voice mid-sentence about the old organ would keep talking over the new one.
+    stopSpeaking();
     setOrganId(id);
     setMobileLibrary(false);
     setCompare(false);
@@ -104,7 +129,7 @@ export function AnatomyApp() {
   };
 
   return (
-    <main className="app-shell">
+    <main className="app-shell" data-reading={level}>
       <header className="topbar">
         <button className="brand" type="button" onClick={() => selectOrgan("heart")} aria-label="Anatomy Atelier home">
           <strong>Anatomy Atelier<sup>✦</sup></strong>
@@ -144,7 +169,7 @@ export function AnatomyApp() {
           <Search size={17} />
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search organs, topics…" />
         </label>
-        <button className="profile" aria-label="Open learner profile"><span>MA</span><ChevronDown size={15} /></button>
+        <button className="profile" aria-label="Open grown-up settings" onClick={() => setGrownUpOpen(true)}><span>MA</span><ChevronDown size={15} /></button>
         <button className="mobile-library-trigger" onClick={() => setMobileLibrary(true)} aria-label="Open organ library"><LibraryBig size={20} /></button>
       </header>
 
@@ -210,6 +235,7 @@ export function AnatomyApp() {
           onAutoRotate={setAutoRotate}
           compare={compare}
           onCompare={() => setCompare(!compare)}
+          level={level}
         />
 
         <aside className="info-panel" ref={contentRef}>
@@ -220,9 +246,43 @@ export function AnatomyApp() {
               <OrganArt organ={organ} asset="organ" alt={`${organ.name} anatomical illustration`} size={92} />
             </span>
           </div>
-          <p className="description" data-reveal>{organ.description}</p>
+          <div className="reading-row" data-reveal><ReadingLevelPicker level={level} onChoose={chooseLevel} /></div>
+          <div className="description-row" data-reveal>
+            <p className="description">{description}</p>
+            {canSpeak && (
+              <button
+                type="button"
+                className="speak-button"
+                aria-label={speakingId === "description" ? "Stop reading" : `Read about the ${organ.name.toLowerCase()} aloud`}
+                onClick={() => speak("description", description)}
+              >
+                {speakingId === "description" ? <Square size={15} /> : <Volume2 size={15} />}
+              </button>
+            )}
+          </div>
+          {/* The grown-up wording stays on the page at the kid levels, so a parent
+              reading along still sees the real sentence without taking the child's
+              screen off the simple one. */}
+          {level !== "original" && (
+            <details className="grown-up-copy" data-reveal>
+              <summary>For grown-ups</summary>
+              <p>{organ.description}</p>
+            </details>
+          )}
           <div className="rule" />
-          <h2 data-reveal>Key facts</h2>
+          <div className="facts-heading" data-reveal>
+            <h2>Key facts</h2>
+            {canSpeak && (
+              <button
+                type="button"
+                className="speak-button"
+                aria-label={speakingId === "facts" ? "Stop reading" : "Read all the key facts aloud"}
+                onClick={() => speak("facts", factsAloud)}
+              >
+                {speakingId === "facts" ? <Square size={15} /> : <Volume2 size={15} />}
+              </button>
+            )}
+          </div>
           <dl className="key-facts">
             <div data-reveal><dt><span>◇</span> Size</dt><dd>{organ.size}</dd></div>
             <div data-reveal><dt><span>♙</span> Weight</dt><dd>{organ.weight}</dd></div>
@@ -289,7 +349,15 @@ export function AnatomyApp() {
         </article>
         <article>
           <header><div><em>Clinical notes</em><h3>Common conditions</h3></div><FileText size={17} /></header>
-          <ul>{organ.conditions.map((condition) => <li key={condition}>{condition}</li>)}</ul>
+          {/* The card keeps its slot rather than vanishing — a hole in the grid
+              would read as a bug, and the note explains where they went. */}
+          {conditionsHidden ? (
+            <p className="conditions-hidden">
+              Hidden while a child reading level is on. A grown-up can show these in settings.
+            </p>
+          ) : (
+            <ul>{organ.conditions.map((condition) => <li key={condition}>{condition}</li>)}</ul>
+          )}
           <button onClick={() => setModal("lesson")}>See all <ArrowRight size={14} /></button>
         </article>
         <article className="system-card">
@@ -318,7 +386,7 @@ export function AnatomyApp() {
 
       {view === "library" && (
         <LibraryIndex
-          entries={referenceIndex}
+          entries={libraryEntries}
           onSelectOrgan={openOrganFromIndex}
           onPrefetchOrgan={prefetchOrgan}
         />
@@ -328,7 +396,8 @@ export function AnatomyApp() {
         <NotesView currentOrganId={organId} onSelectOrgan={openOrganFromIndex} />
       )}
 
-      {modal && <LearningModal type={modal} organ={organ} onClose={() => setModal(null)} />}
+      {grownUpOpen && <GrownUpSettings onClose={() => setGrownUpOpen(false)} />}
+      {modal && <LearningModal type={modal} organ={organ} level={level} onClose={() => setModal(null)} />}
       {mobileLibrary && <button className="drawer-backdrop" aria-label="Close library" onClick={() => setMobileLibrary(false)} />}
     </main>
   );
@@ -341,7 +410,56 @@ const MODAL_ICON: Record<Exclude<Modal, null>, string> = {
   lesson: "✦",
 };
 
-function LearningModal({ type, organ, onClose }: { type: Exclude<Modal, null>; organ: Organ; onClose: () => void }) {
+function LearningModal({
+  type,
+  organ,
+  level,
+  onClose,
+}: {
+  type: Exclude<Modal, null>;
+  organ: Organ;
+  level: ReadingLevel;
+  onClose: () => void;
+}) {
+  const dialogRef = useRef<HTMLElement>(null);
+
+  // `aria-modal` alone doesn't stop the browser tabbing behind the dialog, and
+  // Escape did nothing. Trap focus inside, restore it to whatever opened the
+  // dialog, and close on Escape.
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    const dialog = dialogRef.current;
+    dialog?.querySelector<HTMLElement>("button, [href], input, select, textarea")?.focus();
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab" || !dialog) return;
+      const focusable = [...dialog.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      )].filter((node) => node.offsetParent !== null);
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey && (active === first || !dialog.contains(active))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      opener?.focus?.();
+    };
+  }, [onClose]);
+
   const organName = organ.name;
   const title =
     type === "quiz" ? `${organName} quick quiz`
@@ -354,6 +472,7 @@ function LearningModal({ type, organ, onClose }: { type: Exclude<Modal, null>; o
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
       <section
+        ref={dialogRef}
         className={`learning-modal ${type === "system" ? "wide" : ""}`}
         role="dialog"
         aria-modal="true"
@@ -365,12 +484,7 @@ function LearningModal({ type, organ, onClose }: { type: Exclude<Modal, null>; o
         <em>Guided discovery</em>
         <h2 id="modal-title">{title}</h2>
         {type === "quiz" ? (
-          <div className="quiz-options">
-            <p>Which statement best describes the {organName.toLowerCase()}?</p>
-            <button onClick={onClose}>It plays a specialized role in maintaining the body</button>
-            <button onClick={onClose}>It works completely independently</button>
-            <button onClick={onClose}>It is active only during sleep</button>
-          </div>
+          <QuizPanel organ={organ} level={level} onClose={onClose} />
         ) : type === "system" ? (
           <>
             <p>{organ.location}. Trace how the {organName.toLowerCase()} connects to the rest of the body.</p>

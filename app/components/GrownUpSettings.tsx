@@ -1,0 +1,165 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { Lock, LockOpen, ShieldAlert, X } from "lucide-react";
+import { pinAvailable, useParentLock } from "../lib/parent-lock-store";
+
+type Props = { onClose: () => void };
+
+const PIN_LENGTH = 4;
+
+export function GrownUpSettings({ onClose }: Props) {
+  const { hasPin, unlocked, settings, setPin, unlock, lock, update, forgetPin } = useParentLock();
+  const [entry, setEntry] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const supported = pinAvailable();
+
+  useEffect(() => {
+    panelRef.current?.querySelector<HTMLElement>("input, button")?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  const digitsOnly = (value: string) => value.replace(/\D/g, "").slice(0, PIN_LENGTH);
+
+  const create = async () => {
+    if (entry.length !== PIN_LENGTH) return setError(`Use ${PIN_LENGTH} digits.`);
+    if (entry !== confirm) return setError("Those two don't match.");
+    setBusy(true);
+    await setPin(entry);
+    setBusy(false);
+    setEntry("");
+    setConfirm("");
+    setError(null);
+  };
+
+  const tryUnlock = async () => {
+    setBusy(true);
+    const ok = await unlock(entry);
+    setBusy(false);
+    setEntry("");
+    setError(ok ? null : "That PIN isn't right.");
+  };
+
+  return (
+    <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
+      <section
+        className="learning-modal grown-up-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="grownup-title"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <button className="modal-close" onClick={onClose} aria-label="Close"><X size={18} /></button>
+        <span className="modal-icon">{unlocked ? <LockOpen size={22} /> : <Lock size={22} />}</span>
+        <em>Grown-ups only</em>
+        <h2 id="grownup-title">Settings for parents</h2>
+
+        <div ref={panelRef}>
+          {!supported ? (
+            <p className="grownup-note">
+              This browser can’t store a PIN securely, so the settings below stay at their safe
+              defaults. Everything still works — conditions stay hidden.
+            </p>
+          ) : !hasPin ? (
+            <>
+              <p className="grownup-note">
+                Pick a {PIN_LENGTH}-digit PIN. It keeps the settings below out of a child’s reach
+                and is only needed to change them.
+              </p>
+              <label className="pin-field">
+                <span>New PIN</span>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  value={entry}
+                  onChange={(event) => setEntry(digitsOnly(event.target.value))}
+                />
+              </label>
+              <label className="pin-field">
+                <span>Again</span>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  value={confirm}
+                  onChange={(event) => setConfirm(digitsOnly(event.target.value))}
+                  onKeyDown={(event) => event.key === "Enter" && void create()}
+                />
+              </label>
+              {error && <p className="pin-error" role="alert">{error}</p>}
+              <button className="lesson-button" disabled={busy} onClick={() => void create()}>
+                Set PIN
+              </button>
+            </>
+          ) : !unlocked ? (
+            <>
+              <p className="grownup-note">Enter your PIN to change these settings.</p>
+              <label className="pin-field">
+                <span>PIN</span>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  value={entry}
+                  onChange={(event) => setEntry(digitsOnly(event.target.value))}
+                  onKeyDown={(event) => event.key === "Enter" && void tryUnlock()}
+                />
+              </label>
+              {error && <p className="pin-error" role="alert">{error}</p>}
+              <button className="lesson-button" disabled={busy} onClick={() => void tryUnlock()}>
+                Unlock
+              </button>
+              <button className="pin-forget" onClick={forgetPin}>
+                Forgotten it? Clear the PIN and start over
+              </button>
+            </>
+          ) : (
+            <>
+              <label className="grownup-toggle">
+                <span>
+                  <b>Show medical conditions</b>
+                  <small>
+                    The 72 conditions in the Library — stroke, cancer, heart failure. Hidden while a
+                    child reading level is on.
+                  </small>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={settings.showConditions}
+                  onChange={(event) => update({ showConditions: event.target.checked })}
+                />
+              </label>
+
+              <p className="grownup-note">
+                When the “ask a question” feature is built, its controls appear here too — off until
+                you turn them on.
+              </p>
+
+              {/* Said plainly rather than buried: a parent who thinks this is a real
+                  lock will trust it further than it deserves. */}
+              <div className="grownup-warning">
+                <ShieldAlert size={16} />
+                <p>
+                  This PIN stops a young child changing these settings. It is not real security —
+                  an older child who clears the browser’s site data will reset it.
+                </p>
+              </div>
+
+              <button className="lesson-button" onClick={lock}>
+                <Lock size={15} /> Lock again
+              </button>
+            </>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}

@@ -60,7 +60,9 @@ export function LibraryIndex({ entries, onSelectOrgan, onPrefetchOrgan }: Props)
 
       <div className="library-controls">
         <div className="library-filters" role="group" aria-label="Filter by entry type">
-          {FILTERS.map((option) => (
+          {/* A pill reading "0" is a control that does nothing — when a kind is
+              absent (conditions hidden at a child reading level), drop it. */}
+          {FILTERS.filter((option) => (counts[option.key] ?? 0) > 0).map((option) => (
             <button
               key={option.key}
               type="button"

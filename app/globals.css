@@ -514,6 +514,194 @@ button.organ-card-image:focus-visible { outline: 2px solid #8b6fc4; outline-offs
 .system-organ > svg { color: var(--muted); }
 .system-tile > button { margin-top: auto; }
 
+/* ---- Reading levels, read-aloud, quiz ---------------------------------- */
+.reading-picker { display: flex; align-items: center; gap: 5px; margin: 16px 0 4px; flex-wrap: wrap; }
+.reading-picker > span { color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: .1em; margin-right: 2px; }
+.reading-picker button {
+  min-height: 30px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: rgba(255,255,255,.34);
+  cursor: pointer;
+  font: 500 11px var(--font-serif), serif;
+}
+.reading-picker button.active { background: rgba(142,109,197,.11); border-color: rgba(142,109,197,.34); color: #6d568f; }
+
+.description-row, .facts-heading { display: flex; align-items: flex-start; gap: 10px; }
+.facts-heading { align-items: center; justify-content: space-between; }
+.facts-heading h2 { margin: 17px 0 10px; }
+.description-row .description { flex: 1; }
+/* Read-aloud is always a deliberate tap — nothing here ever autoplays. */
+.speak-button {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: rgba(255,255,255,.4);
+  color: var(--lavender);
+  cursor: pointer;
+}
+.speak-button:hover { background: rgba(142,109,197,.1); }
+
+.grown-up-copy { margin: 2px 0 0; }
+.grown-up-copy summary { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .1em; cursor: pointer; }
+.grown-up-copy p { margin: 7px 0 0; color: #6e655f; font: 500 12px/1.45 var(--font-serif), serif; }
+
+/* Kid line leads; the anatomical wording stays visible beneath it. */
+.callout-kid { font-size: 11px !important; color: var(--ink) !important; }
+.callout-term { margin-top: 4px !important; font-style: italic; opacity: .75; }
+.callout-speak {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--lavender);
+  cursor: pointer;
+}
+.callout-speak:hover { background: rgba(142,109,197,.12); }
+
+.quiz-panel { text-align: left; }
+.quiz-progress { display: flex; gap: 5px; justify-content: center; margin-bottom: 16px; }
+.quiz-progress i { width: 22px; height: 4px; border-radius: 99px; background: rgba(117,91,70,.16); }
+.quiz-progress i.past { background: #b9cfa9; }
+.quiz-progress i.here { background: var(--coral); }
+.quiz-prompt { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 14px; }
+.quiz-prompt p { margin: 0; flex: 1; font: 500 17px/1.4 var(--font-serif), serif; }
+.quiz-option {
+  width: 100%;
+  padding: 13px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255,255,255,.5);
+  cursor: pointer;
+  text-align: left;
+  font: 500 14px/1.35 var(--font-serif), serif;
+}
+.quiz-option:hover:enabled { background: #fff; }
+.quiz-option:disabled { cursor: default; }
+.quiz-option.right { background: rgba(150,183,138,.16); border-color: #96b78a; color: #4f6b45; }
+.quiz-option.wrong { background: rgba(226,124,107,.13); border-color: #e0917c; color: #a4574a; }
+.quiz-option.dim { opacity: .5; }
+.quiz-feedback { margin-top: 14px; }
+.quiz-feedback strong { display: block; font: 500 16px var(--font-serif), serif; }
+/* The extra fact is the point for a parent reading along — it gives them
+   somewhere to take the conversation after "right" or "wrong". */
+.quiz-note { display: flex; gap: 7px; margin-top: 8px; color: #86663c; font: 500 12px/1.45 var(--font-serif), serif; }
+.quiz-note svg { flex: none; margin-top: 2px; }
+.quiz-done { text-align: center; }
+.quiz-score { display: block; font: 500 46px/1 var(--font-serif), serif; color: var(--coral); }
+.quiz-done p { margin: 12px 0 18px; color: #6e655f; font: 500 14px/1.5 var(--font-serif), serif; }
+.quiz-done-actions { display: flex; flex-direction: column; gap: 8px; }
+.quiz-done-actions > button:first-child {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255,255,255,.5);
+  cursor: pointer;
+  font: 500 12px var(--font-serif), serif;
+}
+.quiz-done-actions .lesson-button { margin-top: 0; }
+
+/* Reading text scales up at the kid levels. Only prose the child actually reads
+   is touched — the 9px uppercase kickers are labels, and growing those would
+   break the layout without helping anyone read. */
+.app-shell[data-reading="standard"] .description { font-size: 16px; }
+.app-shell[data-reading="standard"] .key-facts dd { font-size: 13px; }
+.app-shell[data-reading="standard"] .callout-kid { font-size: 12px !important; }
+.app-shell[data-reading="simple"] .description { font-size: 18px; line-height: 1.5; }
+.app-shell[data-reading="simple"] .key-facts dt { font-size: 14px; }
+.app-shell[data-reading="simple"] .key-facts dd { font-size: 14px; }
+.app-shell[data-reading="simple"] .medical-note p,
+.app-shell[data-reading="simple"] .fun-note p { font-size: 12px; }
+.app-shell[data-reading="simple"] .callout-kid { font-size: 13px !important; }
+.app-shell[data-reading="simple"] .organ-item small { font-size: 11px; }
+.app-shell[data-reading="simple"] .quiz-option { font-size: 15px; }
+.app-shell[data-reading="simple"] .quiz-prompt p { font-size: 18px; }
+
+/* ---- Grown-up settings -------------------------------------------------- */
+.grown-up-panel { text-align: left; }
+.grown-up-panel .modal-icon { color: var(--lavender); background: rgba(142,109,197,.1); }
+.grown-up-panel > em, .grown-up-panel > h2 { text-align: center; }
+.grownup-note { margin: 0 0 14px; color: #6e655f; font: 500 13px/1.5 var(--font-serif), serif; }
+.pin-field { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.pin-field span { width: 66px; color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: .1em; }
+.pin-field input {
+  flex: 1;
+  height: 42px;
+  padding: 0 13px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255,255,255,.6);
+  color: var(--ink);
+  /* Four digits read one-handed on a tablet, so they get room. */
+  font: 500 20px/1 var(--font-serif), serif;
+  letter-spacing: .4em;
+}
+.pin-field input:focus-visible { outline: 2px solid #8b6fc4; outline-offset: 1px; }
+.pin-error { margin: 4px 0 10px; color: #b4614f; font: 500 12px var(--font-serif), serif; }
+.pin-forget {
+  width: 100%;
+  margin-top: 9px;
+  padding: 9px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font: 500 11px var(--font-serif), serif;
+  text-decoration: underline;
+}
+.grownup-toggle {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: rgba(255,255,255,.4);
+  cursor: pointer;
+}
+.grownup-toggle b { display: block; font: 500 14px var(--font-serif), serif; }
+.grownup-toggle small { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; line-height: 1.4; }
+.grownup-toggle input { flex: none; width: 20px; height: 20px; margin-top: 2px; accent-color: var(--lavender); }
+.grownup-warning {
+  display: flex;
+  gap: 9px;
+  margin: 14px 0 0;
+  padding: 11px;
+  border-radius: 12px;
+  background: rgba(198,154,94,.11);
+  color: #86663c;
+}
+.grownup-warning svg { flex: none; margin-top: 1px; }
+.grownup-warning p { margin: 0; font: 500 11px/1.45 var(--font-serif), serif; }
+.conditions-hidden {
+  margin: var(--card-gap-top) 0 var(--card-gap-bottom);
+  flex: 1;
+  display: flex;
+  align-items: center;
+  color: var(--muted);
+  font: 500 11px/1.5 var(--font-serif), serif;
+}
+
 /* ---- Reference library ------------------------------------------------- */
 .library-index, .notes-view { max-width: 1180px; margin: 12px auto 0; }
 .library-heading, .notes-heading { max-width: 640px; margin: 10px auto 22px; text-align: center; }
@@ -712,12 +900,29 @@ button.organ-card-image:focus-visible { outline: 2px solid #8b6fc4; outline-offs
   .main-nav button { padding: 10px; }
   .workspace { grid-template-columns: 210px minmax(450px,1fr); height: 690px; }
   .info-panel { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1.2fr; gap: 12px 22px; max-height: none; }
-  .info-panel .description, .info-panel .rule, .info-panel h2, .key-facts, .medical-note { grid-column: 2; }
+  /* The reading picker, the description row, the grown-up reveal and the facts
+     heading are all new wrappers around what used to be bare children — they
+     have to be named here or the grid auto-places them into column 1. */
+  .info-panel .reading-row, .info-panel .description-row, .info-panel .grown-up-copy,
+  .info-panel .rule, .info-panel .facts-heading, .key-facts, .medical-note { grid-column: 2; }
   .info-kicker, .info-title-row { grid-column: 1; }
   .info-panel { height: 330px; }
   .workspace { height: auto; }
   .organ-library, .viewer-shell { height: 650px; }
   .systems-grid { grid-template-columns: repeat(2, 1fr); }
+  /* Measured on an iPad in portrait: the description came out at 15px and the
+     key-facts values at 12px. A tablet on a couch, shared by an adult and a
+     child, needs more than that — so reading text steps up from here down,
+     at every reading level. */
+  .description { font-size: 17px; line-height: 1.45; }
+  .key-facts dt { font-size: 14px; }
+  .key-facts dd { font-size: 13px; }
+  .key-facts > div { grid-template-columns: 118px 1fr; }
+  .medical-note p, .fun-note p { font-size: 12px; }
+  .organ-item small { font-size: 11px; }
+  .callout-body b { font-size: 14px; }
+  .callout-body small { font-size: 11px; }
+  .quiz-option { font-size: 15px; }
 }
 
 @media (max-width: 760px) {

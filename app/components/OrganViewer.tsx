@@ -10,9 +10,13 @@ import {
   ScanLine,
   Search,
   Sparkles,
+  Square,
+  Volume2,
   X,
 } from "lucide-react";
 import type { Hotspot, Organ } from "../lib/anatomy-data";
+import { hotspotReading, type ReadingLevel } from "../lib/kid-readings";
+import { useSpeech } from "../lib/use-speech";
 import type { AnatomyViewer } from "../lib/three/viewer";
 
 type Props = {
@@ -21,9 +25,10 @@ type Props = {
   onAutoRotate: (enabled: boolean) => void;
   compare: boolean;
   onCompare: () => void;
+  level: ReadingLevel;
 };
 
-export function OrganViewer({ organ, autoRotate, onAutoRotate, compare, onCompare }: Props) {
+export function OrganViewer({ organ, autoRotate, onAutoRotate, compare, onCompare, level }: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<AnatomyViewer | null>(null);
   const organRef = useRef(organ);
@@ -33,6 +38,11 @@ export function OrganViewer({ organ, autoRotate, onAutoRotate, compare, onCompar
   const [progress, setProgress] = useState(0);
   const [slowLoad, setSlowLoad] = useState(false);
   const [activeTool, setActiveTool] = useState<string | null>(null);
+  const { supported: canSpeak, speakingId, speak, stop: stopSpeaking } = useSpeech(level);
+  const kidLine = selected ? hotspotReading(organ.id, selected.id, level) : null;
+  // Keyed per hotspot so re-opening a different dot doesn't inherit the previous
+  // dot's speaking state.
+  const calloutSpeechId = selected ? `callout:${organ.id}:${selected.id}` : "callout";
 
   // A typical organ is ready well inside a second — flashing a loading panel for
   // that reads as jank. It only appears if the fetch is genuinely slow; the flag
@@ -87,6 +97,10 @@ export function OrganViewer({ organ, autoRotate, onAutoRotate, compare, onCompar
       setProgress(0);
     });
   }, [organ]);
+
+  // Switching organ drops the open callout, so its voice — and the Stop icon on
+  // its button — have to go with it.
+  useEffect(() => stopSpeaking, [organ, stopSpeaking]);
 
   useEffect(() => viewerRef.current?.setAutoRotate(autoRotate), [autoRotate]);
 
@@ -154,7 +168,27 @@ export function OrganViewer({ organ, autoRotate, onAutoRotate, compare, onCompar
               <X size={13} />
             </button>
             <b>{selected.label}</b>
-            <small>{selected.detail}</small>
+            {/* The kid line leads and the anatomical one stays beneath it, so the
+                child reads plain words while a parent alongside still sees the
+                real wording — no toggling, no taking the screen off one of them. */}
+            {kidLine ? (
+              <>
+                <small className="callout-kid">{kidLine}</small>
+                <small className="callout-term">{selected.detail}</small>
+              </>
+            ) : (
+              <small>{selected.detail}</small>
+            )}
+            {canSpeak && (
+              <button
+                type="button"
+                className="callout-speak"
+                aria-label={speakingId === calloutSpeechId ? "Stop reading" : `Read about the ${selected.label.toLowerCase()} aloud`}
+                onClick={() => speak(calloutSpeechId, `${selected.label}. ${kidLine ?? selected.detail}`)}
+              >
+                {speakingId === calloutSpeechId ? <Square size={13} /> : <Volume2 size={13} />}
+              </button>
+            )}
           </div>
         </div>
       )}
