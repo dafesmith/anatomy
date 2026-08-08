@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Prebuilt three.js decoders, vendored alongside their .wasm payloads.
+    // Upstream bundles we do not edit, so linting them only produces noise.
+    "public/draco/**",
+    "public/basis/**",
   ]),
 ]);
 

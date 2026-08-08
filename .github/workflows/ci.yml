@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 22 is the floor in package.json engines, and the oldest line where Node
+      # strips TypeScript without a flag — which the test suite relies on to
+      # import app/lib/anatomy-data.ts directly.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run lint
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      # Builds the vinext/Cloudflare worker, then asserts against its output.
+      - run: npm test
+
+      # The build Vercel actually ships, which `npm test` does not exercise.
+      - run: npm run build:next
