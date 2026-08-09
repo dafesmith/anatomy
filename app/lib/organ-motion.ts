@@ -21,6 +21,14 @@ export type OrganMotion = {
   period: number;
   /** Peak scale increase, as a fraction. */
   amount: number;
+  /**
+   * What to call this on the sound button.
+   *
+   * Carried here rather than derived from `kind`, because `kind` is the shape of
+   * the curve and not the name of the thing: the resting organs borrow the breath
+   * curve, and labelling a liver "Breathing" is simply wrong.
+   */
+  label: string;
 };
 
 /**
@@ -28,13 +36,13 @@ export type OrganMotion = {
  * faster one, because it has to read as a heartbeat to a parent watching too, and
  * a 110bpm model looks panicked.
  */
-const HEART: OrganMotion = { kind: "heartbeat", period: 0.85, amount: 0.036 };
+const HEART: OrganMotion = { kind: "heartbeat", period: 0.85, amount: 0.036, label: "Heartbeat" };
 
 /** 4s is 15 breaths a minute, and slow enough to breathe along with. */
-const LUNGS: OrganMotion = { kind: "breath", period: 4, amount: 0.045 };
+const LUNGS: OrganMotion = { kind: "breath", period: 4, amount: 0.045, label: "Breathing" };
 
 /** Peristalsis is far slower than either, and travels rather than pulses. */
-const GUT: OrganMotion = { kind: "wave", period: 6.5, amount: 0.022 };
+const GUT: OrganMotion = { kind: "wave", period: 6.5, amount: 0.022, label: "Rumble" };
 
 /**
  * Everything else gets a whisper of the same breath.
@@ -43,7 +51,10 @@ const GUT: OrganMotion = { kind: "wave", period: 6.5, amount: 0.022 };
  * next to one that beats looks broken rather than accurate. This is small enough
  * to be felt rather than seen.
  */
-const RESTING: OrganMotion = { kind: "breath", period: 5.5, amount: 0.013 };
+// "Whoosh" rather than "Breathing": these organs borrow the breath curve, but what
+// a liver or a kidney would actually sound like is blood moving through it, which
+// is also what the filtered noise in the synth resembles.
+const RESTING: OrganMotion = { kind: "breath", period: 5.5, amount: 0.013, label: "Whoosh" };
 
 const BY_ORGAN: Partial<Record<OrganId, OrganMotion>> = {
   heart: HEART,
@@ -53,6 +64,62 @@ const BY_ORGAN: Partial<Record<OrganId, OrganMotion>> = {
 
 export function organMotion(organId: OrganId): OrganMotion {
   return BY_ORGAN[organId] ?? RESTING;
+}
+
+/**
+ * The moments in one cycle when something is audible.
+ *
+ * Kept here rather than in the sound module so the ear and the eye cannot drift
+ * apart: `at` is the same phase the corresponding bump peaks at below, so the
+ * thump lands on the frame where the organ is at its fullest. Scheduling audio on
+ * its own timer at the same period would look synced for a few seconds and then
+ * visibly slide.
+ */
+export type MotionCue = {
+  /** Position in the cycle, 0 to 1. */
+  at: number;
+  /** Relative loudness, 0 to 1. */
+  strength: number;
+};
+
+export function motionCues(motion: OrganMotion): MotionCue[] {
+  if (motion.kind === "heartbeat") {
+    // Lub and dub, at the two bump centres.
+    return [
+      { at: 0.04, strength: 1 },
+      { at: 0.2, strength: 0.55 },
+    ];
+  }
+  if (motion.kind === "breath") {
+    // In at the start of the rise, out at the top. Two sounds per cycle, because a
+    // breath you only hear half of sounds like a leak.
+    return [
+      { at: 0, strength: 1 },
+      { at: 0.5, strength: 0.7 },
+    ];
+  }
+  // One soft squeeze per wave.
+  return [{ at: 0.25, strength: 0.55 }];
+}
+
+/**
+ * Which cues were passed between two frames.
+ *
+ * Separated from the render loop because the wrap is fiddly and worth testing on
+ * its own: a cycle boundary falls between two frames roughly once a second, a
+ * slow frame can step over a cue or an entire cycle, and `lastPhase` starts below
+ * zero so that a cue sitting exactly at phase 0 is not skipped on the first pass.
+ *
+ * A frame long enough to span a whole period returns every cue once rather than
+ * several times — a stall should not produce a machine-gun burst of heartbeats
+ * when the tab comes back.
+ */
+export function crossedCues(cues: MotionCue[], lastPhase: number, phase: number): MotionCue[] {
+  if (phase === lastPhase) return [];
+  const wrapped = phase < lastPhase;
+  return cues.filter((cue) =>
+    wrapped ? cue.at > lastPhase || cue.at <= phase : cue.at > lastPhase && cue.at <= phase,
+  );
 }
 
 /** A Gaussian bump, used to shape the two thumps of a heartbeat. */

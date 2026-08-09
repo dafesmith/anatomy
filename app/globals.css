@@ -1240,3 +1240,30 @@ button.organ-card-image:focus-visible { outline: 2px solid #8b6fc4; outline-offs
 @media (prefers-reduced-motion: reduce) {
   *, *:before, *:after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
 }
+
+/* Sound toggle, sitting beside the auto-rotate switch on the viewer. */
+.organ-sound {
+  position: absolute;
+  right: 18px;
+  bottom: 62px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  padding: 0 13px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: rgba(255,255,255,.82);
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-size: 11px;
+  letter-spacing: .04em;
+  backdrop-filter: blur(6px);
+}
+.organ-sound:hover { background: #fff; color: var(--ink); }
+.organ-sound[aria-pressed="true"] { border-color: var(--coral); color: var(--coral); }
+@media (max-width: 780px) {
+  /* Stacked above the rotate switch rather than beside it — there is no room for
+     two pills on a phone. */
+  .organ-sound { right: 14px; bottom: 56px; }
+}

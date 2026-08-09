@@ -12,12 +12,14 @@ import {
   Sparkles,
   Square,
   Volume2,
+  VolumeX,
   X,
 } from "lucide-react";
 import type { Hotspot, Organ } from "../lib/anatomy-data";
 import { hotspotReading, type ReadingLevel } from "../lib/kid-readings";
 import { useSpeech } from "../lib/use-speech";
 import { organMotion } from "../lib/organ-motion";
+import { OrganSound, useOrganSound } from "../lib/organ-sound";
 import type { AnatomyViewer } from "../lib/three/viewer";
 
 type Props = {
@@ -63,11 +65,19 @@ export function OrganViewer({
   /** Where a tap landed that hit no label — the prompt for "what's this bit?". */
   const [bareTap, setBareTap] = useState<{ x: number; y: number } | null>(null);
   const askEnabledRef = useRef(askEnabled);
+  const soundRef = useRef<OrganSound | null>(null);
+  const { enabled: soundOn, toggle: toggleSound } = useOrganSound();
+  const soundOnRef = useRef(soundOn);
+  const organKindRef = useRef(organMotion(organ.id).kind);
   const { supported: canSpeak, speakingId, speak, stop: stopSpeaking } = useSpeech(level);
   const kidLine = selected ? hotspotReading(organ.id, selected.id, level) : null;
   // Keyed per hotspot so re-opening a different dot doesn't inherit the previous
   // dot's speaking state.
   const calloutSpeechId = selected ? `callout:${organ.id}:${selected.id}` : "callout";
+
+  // What this organ actually sounds like, so the button says something concrete
+  // rather than just "Sound".
+  const soundLabel = organMotion(organ.id).label;
 
   // A typical organ is ready well inside a second — flashing a loading panel for
   // that reads as jank. It only appears if the fetch is genuinely slow; the flag
@@ -80,7 +90,22 @@ export function OrganViewer({
 
   useEffect(() => {
     organRef.current = organ;
+    organKindRef.current = organMotion(organ.id).kind;
   }, [organ]);
+
+  useEffect(() => {
+    soundOnRef.current = soundOn;
+    // Switching off should stop what is already ringing, not just skip the next
+    // cue — the tail of a breath is over a second long.
+    soundRef.current?.mute(!soundOn);
+  }, [soundOn]);
+
+  // Silenced while a modal covers the viewer, matching the render loop. A
+  // heartbeat still thumping under a settings panel sounds like a bug.
+  useEffect(() => {
+    if (covered) soundRef.current?.mute(true);
+    else if (soundOn) soundRef.current?.mute(false);
+  }, [covered, soundOn]);
 
   useEffect(() => {
     autoRotateRef.current = autoRotate;
@@ -113,6 +138,14 @@ export function OrganViewer({
         onUnlabelledTap: (point) => {
           if (askEnabledRef.current) setBareTap(point);
         },
+        onBeat: (strength) => {
+          if (!soundOnRef.current) return;
+          // Built on first use, which is always inside the gesture that switched
+          // sound on — so the browser's autoplay policy is satisfied by the same
+          // tap that asked for it.
+          soundRef.current ??= new OrganSound();
+          soundRef.current.play(organKindRef.current, strength);
+        },
       });
       viewerRef.current = viewer;
       // Local-only handle, alongside the existing /__debug surface. `capture()` is
@@ -135,6 +168,8 @@ export function OrganViewer({
       cancelled = true;
       viewerRef.current = null;
       viewer?.dispose();
+      soundRef.current?.dispose();
+      soundRef.current = null;
     };
   }, []);
 
@@ -284,6 +319,20 @@ export function OrganViewer({
           <span>{Math.max(8, Math.round(progress * 100))}%</span>
         </div>
       )}
+
+      {/* Named for what it actually plays, per organ — "Sound" gives a child no
+          idea there is a heartbeat behind it. Off until pressed: audio that starts
+          on its own is unwelcome on a shared tablet, and browsers block it anyway. */}
+      <button
+        className="organ-sound"
+        type="button"
+        onClick={toggleSound}
+        aria-pressed={soundOn}
+        title={soundOn ? "Turn the sound off" : `Hear the ${organ.name.toLowerCase()}`}
+      >
+        {soundOn ? <Volume2 size={14} /> : <VolumeX size={14} />}
+        <span>{soundLabel}</span>
+      </button>
 
       <button className="auto-rotate" type="button" onClick={() => onAutoRotate(!autoRotate)} aria-pressed={autoRotate}>
         <RotateCcw size={14} /> Auto rotate

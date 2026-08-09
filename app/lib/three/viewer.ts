@@ -4,7 +4,7 @@ import gsap from "gsap";
 import type { Hotspot } from "../anatomy-data";
 import { AnatomyAssetManager, type LoadedOrgan } from "./loaders";
 import { HotspotLayer } from "./hotspots";
-import { motionScale, type OrganMotion } from "../organ-motion";
+import { crossedCues, motionCues, motionScale, type MotionCue, type OrganMotion } from "../organ-motion";
 
 type ViewerCallbacks = {
   onLoading: (loading: boolean, progress: number) => void;
@@ -13,6 +13,8 @@ type ViewerCallbacks = {
    *  35 hotspots cover a fraction of each model, so this is where "what's this
    *  bit?" comes from — the app has no answer, which is the whole point. */
   onUnlabelledTap?: (point: { x: number; y: number }) => void;
+  /** Fired at each audible moment of the idle rhythm — see `motionCues`. */
+  onBeat?: (strength: number) => void;
 };
 
 const DOT_PIXELS = 34;
@@ -24,6 +26,9 @@ const PLINTH_TOP = PLINTH_Y + 0.17;
  *  rather than an edge-on band across the background. */
 const HOME_CAMERA = { x: 0, y: 1.05, z: 8.2 };
 const HOME_TARGET = { x: 0, y: 0.02, z: 0 };
+/** The coloured accent light: ambient by default, lifted while a dot is held. */
+const GLOW_RESTING = 0.5;
+const GLOW_HELD = 1.75;
 /**
  * How far up and down the camera may travel, as a polar angle from +Y.
  *
@@ -32,10 +37,6 @@ const HOME_TARGET = { x: 0, y: 0.02, z: 0 };
  * a dragging finger going under it; `MIN_POLAR` keeps the camera off the north
  * pole, where the plinth fills the frame from the other direction.
  */
-/** The coloured accent light: ambient by default, lifted while a dot is held. */
-const GLOW_RESTING = 0.5;
-const GLOW_HELD = 1.75;
-
 const MIN_POLAR = 0.45;
 const MAX_POLAR = 1.75;
 
@@ -78,6 +79,11 @@ export class AnatomyViewer {
 
   private motion: OrganMotion | null = null;
   private motionSeconds = 0;
+  private cues: MotionCue[] = [];
+  /** Phase at the previous frame, to spot a cue being crossed. Starts below zero
+   *  so a cue sitting exactly at phase 0 — an inhale — is not missed on the very
+   *  first cycle. */
+  private lastPhase = -1;
   /**
    * A springy overshoot on top of the idle rhythm, fired when a dot is tapped.
    *
@@ -289,6 +295,8 @@ export class AnatomyViewer {
     // screen, and a new one arriving mid-thump looks like a glitch.
     this.motion = motion ?? null;
     this.motionSeconds = 0;
+    this.cues = motion ? motionCues(motion) : [];
+    this.lastPhase = -1;
     this.select(null);
     this.callbacks.onLoading(true, 0);
 
@@ -472,8 +480,19 @@ export class AnatomyViewer {
    * kind of quiet.
    */
   private applyMotion(delta: number) {
-    if (!this.motion || !this.organ || this.prefersReducedMotion) return;
+    if (!this.motion || !this.organ) return;
     this.motionSeconds += delta;
+
+    // Cues fire whether or not the swell is drawn. `prefers-reduced-motion` is
+    // about motion, and a child who has it set — or who is listening rather than
+    // watching — should still hear the heart working.
+    const phase = (this.motionSeconds % this.motion.period) / this.motion.period;
+    for (const cue of crossedCues(this.cues, this.lastPhase, phase)) {
+      this.callbacks.onBeat?.(cue.strength);
+    }
+    this.lastPhase = phase;
+
+    if (this.prefersReducedMotion) return;
     const scale = motionScale(this.motion, this.motionSeconds);
     const pop = this.pop.value;
     this.organ.beat.scale.set(scale.x * pop, scale.y * pop, scale.z * pop);

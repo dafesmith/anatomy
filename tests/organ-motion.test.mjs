@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { organs } from "../app/lib/anatomy-data.ts";
-import { motionScale, organMotion } from "../app/lib/organ-motion.ts";
+import { crossedCues, motionCues, motionScale, organMotion } from "../app/lib/organ-motion.ts";
 
 const trace = (motion, samples = 240) =>
   Array.from({ length: samples }, (_, i) => motionScale(motion, (i / samples) * motion.period));
@@ -105,4 +105,99 @@ test("every cycle wraps cleanly, forwards and backwards in time", () => {
       assert.ok(Number.isFinite(negative[axis]), `${organ.id}: ${axis} is not finite before zero`);
     }
   }
+});
+
+// ---------------------------------------------------------------------------
+// Cues: when a sound happens. The wrap is fiddly and a cycle boundary falls
+// between two frames roughly once a second, so this is tested directly.
+// ---------------------------------------------------------------------------
+
+test("cues land on the same phase the motion peaks at", () => {
+  // If they drift apart, the thump is heard before or after the organ is fullest.
+  const heart = organMotion("heart");
+  const cues = motionCues(heart);
+  for (const cue of cues) {
+    const atCue = motionScale(heart, cue.at * heart.period).x;
+    const halfEarlier = motionScale(heart, (cue.at - 0.08) * heart.period).x;
+    assert.ok(atCue > halfEarlier, `cue at ${cue.at} is not on a rising or peak part of the curve`);
+  }
+});
+
+test("a heartbeat has a loud cue and a softer one; a breath has in and out", () => {
+  const beats = motionCues(organMotion("heart"));
+  assert.equal(beats.length, 2);
+  assert.equal(beats[0].strength, 1);
+  assert.ok(beats[1].strength < beats[0].strength, "the dub should be quieter");
+
+  const breaths = motionCues(organMotion("lungs"));
+  assert.equal(breaths.length, 2, "a breath you only hear half of sounds like a leak");
+  assert.ok(breaths[1].at > breaths[0].at);
+});
+
+test("every cue sits inside the cycle", () => {
+  for (const organ of organs) {
+    for (const cue of motionCues(organMotion(organ.id))) {
+      assert.ok(cue.at >= 0 && cue.at < 1, `${organ.id}: cue at ${cue.at} is outside the cycle`);
+      assert.ok(cue.strength > 0 && cue.strength <= 1, `${organ.id}: strength ${cue.strength}`);
+    }
+  }
+});
+
+test("a cue is crossed exactly once per cycle at a normal frame rate", () => {
+  const heart = organMotion("heart");
+  const cues = motionCues(heart);
+  let last = -1;
+  let counts = new Map();
+  // Three cycles at 60fps.
+  const frames = Math.ceil((heart.period * 3) / (1 / 60));
+  for (let i = 1; i <= frames; i += 1) {
+    const phase = ((i / 60) % heart.period) / heart.period;
+    for (const cue of crossedCues(cues, last, phase)) {
+      counts.set(cue.at, (counts.get(cue.at) ?? 0) + 1);
+    }
+    last = phase;
+  }
+  for (const cue of cues) {
+    assert.equal(counts.get(cue.at), 3, `cue at ${cue.at} fired ${counts.get(cue.at)} times in 3 cycles`);
+  }
+});
+
+test("a cue sitting exactly at phase zero is not missed on the first cycle", () => {
+  // `lastPhase` starts at -1 for precisely this: the inhale is at phase 0, and a
+  // naive `at > lastPhase` with lastPhase 0 would skip it forever.
+  const cues = [{ at: 0, strength: 1 }];
+  assert.equal(crossedCues(cues, -1, 0.01).length, 1, "the first inhale was skipped");
+  // And once per cycle after that, on the wrap.
+  assert.equal(crossedCues(cues, 0.97, 0.02).length, 1);
+  assert.equal(crossedCues(cues, 0.4, 0.5).length, 0);
+});
+
+test("a stalled frame fires each cue once, not a burst", () => {
+  // Coming back to a backgrounded tab can hand the loop a delta covering several
+  // cycles. A child should hear one beat resume, not a machine-gun.
+  const cues = motionCues(organMotion("heart"));
+  assert.equal(crossedCues(cues, 0.5, 0.45).length, 2, "a wrap past both cues should give both");
+  const wholeCycle = crossedCues(cues, 0.9, 0.85);
+  assert.equal(wholeCycle.length, 2);
+  assert.equal(new Set(wholeCycle.map((cue) => cue.at)).size, 2, "the same cue fired twice");
+});
+
+test("no cue fires when the phase has not moved", () => {
+  const cues = motionCues(organMotion("heart"));
+  assert.deepEqual(crossedCues(cues, 0.3, 0.3), []);
+});
+
+test("every organ's sound is named for what it is, not for its curve", () => {
+  // The resting organs borrow the breath curve, so a label derived from `kind`
+  // put "Breathing" on the liver.
+  for (const organ of organs) {
+    const motion = organMotion(organ.id);
+    assert.ok(motion.label, `${organ.id}: no label`);
+    if (organ.id !== "lungs") {
+      assert.notEqual(motion.label, "Breathing", `${organ.id} does not breathe`);
+    }
+  }
+  assert.equal(organMotion("heart").label, "Heartbeat");
+  assert.equal(organMotion("lungs").label, "Breathing");
+  assert.equal(organMotion("liver").label, "Whoosh");
 });
