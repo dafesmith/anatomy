@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Organ } from "../lib/anatomy-data";
+import { organMotion } from "../lib/organ-motion";
 import type { AnatomyViewer } from "../lib/three/viewer";
 
 type Props = {
@@ -60,7 +61,7 @@ export function LessonStage({ organ, hotspotId, active }: Props) {
       viewerRef.current = viewer;
       const current = organRef.current;
       viewer
-        .setOrgan(current.model, current.hotspots, current.accent)
+        .setOrgan(current.model, current.hotspots, current.accent, organMotion(current.id))
         .then(() => {
           if (cancelled) return;
           // Applied after the model exists, because the dot has no position until

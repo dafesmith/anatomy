@@ -17,6 +17,7 @@ import {
 import type { Hotspot, Organ } from "../lib/anatomy-data";
 import { hotspotReading, type ReadingLevel } from "../lib/kid-readings";
 import { useSpeech } from "../lib/use-speech";
+import { organMotion } from "../lib/organ-motion";
 import type { AnatomyViewer } from "../lib/three/viewer";
 
 type Props = {
@@ -124,7 +125,7 @@ export function OrganViewer({
       }
       viewer.setAutoRotate(autoRotateRef.current);
       const current = organRef.current;
-      viewer.setOrgan(current.model, current.hotspots, current.accent).catch(() => {
+      viewer.setOrgan(current.model, current.hotspots, current.accent, organMotion(current.id)).catch(() => {
         setLoading(false);
         setProgress(0);
       });
@@ -138,7 +139,7 @@ export function OrganViewer({
   }, []);
 
   useEffect(() => {
-    viewerRef.current?.setOrgan(organ.model, organ.hotspots, organ.accent).catch(() => {
+    viewerRef.current?.setOrgan(organ.model, organ.hotspots, organ.accent, organMotion(organ.id)).catch(() => {
       setLoading(false);
       setProgress(0);
     });

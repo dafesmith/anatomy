@@ -4,6 +4,7 @@ import gsap from "gsap";
 import type { Hotspot } from "../anatomy-data";
 import { AnatomyAssetManager, type LoadedOrgan } from "./loaders";
 import { HotspotLayer } from "./hotspots";
+import { motionScale, type OrganMotion } from "../organ-motion";
 
 type ViewerCallbacks = {
   onLoading: (loading: boolean, progress: number) => void;
@@ -31,6 +32,10 @@ const HOME_TARGET = { x: 0, y: 0.02, z: 0 };
  * a dragging finger going under it; `MIN_POLAR` keeps the camera off the north
  * pole, where the plinth fills the frame from the other direction.
  */
+/** The coloured accent light: ambient by default, lifted while a dot is held. */
+const GLOW_RESTING = 0.5;
+const GLOW_HELD = 1.75;
+
 const MIN_POLAR = 0.45;
 const MAX_POLAR = 1.75;
 
@@ -70,6 +75,25 @@ export class AnatomyViewer {
   private loadRequest = 0;
 
   private basePixelRatio: number;
+
+  private motion: OrganMotion | null = null;
+  private motionSeconds = 0;
+  /**
+   * A springy overshoot on top of the idle rhythm, fired when a dot is tapped.
+   *
+   * Held separately and multiplied in rather than tweened onto the beat group
+   * directly, because `applyMotion` rewrites that group's scale every frame and
+   * would erase a tween on it within one tick.
+   */
+  private pop = { value: 1 };
+  /** The organ's own accent, to return the glow to when a dot is released. */
+  private accent = new THREE.Color(0xee7c6a);
+  /**
+   * Honoured for the idle rhythm specifically. A beating organ is continuous
+   * motion nobody asked for, which is exactly what this preference is about — and
+   * a child with vestibular sensitivity is squarely in this app's audience.
+   */
+  private prefersReducedMotion = false;
 
   private autoRotateWanted = true;
   private interactionUntil = 0;
@@ -130,6 +154,8 @@ export class AnatomyViewer {
     this.controls.autoRotateSpeed = 0.65;
     this.controls.target.set(HOME_TARGET.x, HOME_TARGET.y, HOME_TARGET.z);
 
+    this.prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
     this.assets = new AnatomyAssetManager(this.renderer);
     this.buildEnvironment();
 
@@ -175,7 +201,7 @@ export class AnatomyViewer {
     const warm = new THREE.PointLight(0xff8d70, 0.72, 11, 2);
     warm.position.set(-3, -1.4, 3.5);
     this.scene.add(warm);
-    const glow = new THREE.PointLight(0xee7c6a, 0.5, 8, 2);
+    const glow = new THREE.PointLight(0xee7c6a, GLOW_RESTING, 8, 2);
     glow.name = "organ-glow";
     glow.position.set(2.8, 0.4, 2.8);
     this.scene.add(glow);
@@ -257,8 +283,12 @@ export class AnatomyViewer {
     this.assets.prefetch(url);
   }
 
-  async setOrgan(modelUrl: string, hotspots: Hotspot[], accent: string) {
+  async setOrgan(modelUrl: string, hotspots: Hotspot[], accent: string, motion?: OrganMotion) {
     const request = ++this.loadRequest;
+    // Reset rather than carry over: the phase belongs to the organ that was on
+    // screen, and a new one arriving mid-thump looks like a glitch.
+    this.motion = motion ?? null;
+    this.motionSeconds = 0;
     this.select(null);
     this.callbacks.onLoading(true, 0);
 
@@ -302,11 +332,12 @@ export class AnatomyViewer {
     organ.pivot.updateWorldMatrix(true, true);
 
     // Anchor the dots while the organ is still invisible, then play the intro.
-    this.hotspots.attach(organ.pivot, hotspots, organ.meshes);
+    this.hotspots.attach(organ.beat, hotspots, organ.meshes);
     this.hotspots.setPixelSize(DOT_PIXELS, this.height, CAMERA_FOV);
     if (this.crossSection) this.applyClipping(true);
 
     const glow = this.scene.getObjectByName("organ-glow") as THREE.PointLight | undefined;
+    this.accent.set(accent);
     glow?.color.set(accent);
 
     organ.pivot.scale.setScalar(0.58);
@@ -404,6 +435,7 @@ export class AnatomyViewer {
     const now = performance.now();
 
     this.applyAutoRotate(now);
+    this.applyMotion(delta);
     if (this.controls.update(delta)) this.dirty = true;
     if (this.assets.hasAnimation) {
       this.assets.update(delta);
@@ -428,6 +460,24 @@ export class AnatomyViewer {
   private tween(target: object, vars: gsap.TweenVars) {
     this.busy((vars.duration as number) ?? 0.5);
     return gsap.to(target, { ...vars, onUpdate: () => (this.dirty = true) });
+  }
+
+  /**
+   * The idle rhythm — a heartbeat, a breath — applied to the beat group.
+   *
+   * Marks the frame dirty every tick, so this is the one thing in here that
+   * defeats render-on-demand. It costs nothing in practice: auto-rotate is on by
+   * default and already renders continuously, and when a child switches that off
+   * to look at something closely, a heart that stopped beating would be the wrong
+   * kind of quiet.
+   */
+  private applyMotion(delta: number) {
+    if (!this.motion || !this.organ || this.prefersReducedMotion) return;
+    this.motionSeconds += delta;
+    const scale = motionScale(this.motion, this.motionSeconds);
+    const pop = this.pop.value;
+    this.organ.beat.scale.set(scale.x * pop, scale.y * pop, scale.z * pop);
+    this.dirty = true;
   }
 
   private applyAutoRotate(now: number) {
@@ -512,7 +562,40 @@ export class AnatomyViewer {
     this.selectedId = id;
     this.busy(0.4);
     const marker = this.hotspots.list.find((item) => item.hotspot.id === id);
+    this.respondToTouch(marker?.hotspot.color ?? null);
     this.callbacks.onSelect(marker?.hotspot ?? null);
+  }
+
+  /**
+   * What tapping a dot feels like: the model gives a little squeeze, and the light
+   * on it turns that part's colour.
+   *
+   * Every hotspot carries its own colour, so the six parts of the heart each wash
+   * the scene differently — the point being that a tap does something a child can
+   * see from across the room, not just open a panel of text. Releasing the dot
+   * fades back to the organ's own accent.
+   */
+  private respondToTouch(colour: string | null) {
+    const glow = this.scene.getObjectByName("organ-glow") as THREE.PointLight | undefined;
+    if (glow) {
+      const target = colour ? new THREE.Color(colour) : this.accent;
+      this.tween(glow.color, { r: target.r, g: target.g, b: target.b, duration: 0.45, ease: "power2.out" });
+      // Brightened while a part is held, or the wash is too polite to notice —
+      // a tap should be visible from across the room, not on close inspection.
+      // Back to the ambient level on release, where it is scene lighting again
+      // rather than a highlight.
+      this.tween(glow, {
+        intensity: colour ? GLOW_HELD : GLOW_RESTING,
+        duration: 0.45,
+        ease: "power2.out",
+      });
+    }
+    // Only on the way in. A squeeze when a child dismisses a label reads as the
+    // model flinching away from them.
+    if (!colour || this.prefersReducedMotion) return;
+    gsap.killTweensOf(this.pop);
+    this.pop.value = 1;
+    this.tween(this.pop, { value: 1.055, duration: 0.14, yoyo: true, repeat: 1, ease: "power2.out" });
   }
 
   clearSelection() {

@@ -13,6 +13,8 @@ export type LoadedOrgan = {
   url: string;
   /** Hotspot space: the fitted model, centred on the origin, spanning FIT_SIZE. */
   pivot: THREE.Group;
+  /** Carries the idle rhythm. Hotspots attach here so they ride the surface. */
+  beat: THREE.Group;
   meshes: THREE.Mesh[];
   mixer: THREE.AnimationMixer | null;
 };
@@ -82,8 +84,20 @@ export class AnatomyAssetManager {
     // so hotspot coordinates stay in the normalised FIT_SIZE space.
     const pivot = new THREE.Group();
     pivot.name = "organ-pivot";
-    pivot.add(model);
     pivot.rotation.set(0.05, -0.28, 0);
+
+    // A group of its own for the idle rhythm — the heartbeat, the breath — sitting
+    // between the pivot and the model.
+    //
+    // It cannot share the pivot: the entrance animation tweens `pivot.scale` from
+    // 0.58 to 1, and a per-frame write would stomp that tween. It has to be a
+    // *parent* of the hotspots rather than a sibling of them, because a beat
+    // applied below the dots would swell the surface out from under them and leave
+    // them floating in front of the organ at every peak.
+    const beat = new THREE.Group();
+    beat.name = "organ-beat";
+    beat.add(model);
+    pivot.add(beat);
 
     const meshes: THREE.Mesh[] = [];
     model.traverse((child) => {
@@ -151,13 +165,16 @@ export class AnatomyAssetManager {
       gltf.animations.forEach((clip) => mixer?.clipAction(clip).play());
     }
 
-    return { url, pivot, meshes, mixer };
+    return { url, pivot, beat, meshes, mixer };
   }
 
   /** Undoes viewer tools (wireframe, clipping, fade) before a cached organ returns. */
   private resetMaterials(organ: LoadedOrgan) {
     organ.pivot.rotation.set(0.05, -0.28, 0);
     organ.pivot.position.set(0, 0, 0);
+    // Otherwise a cached organ returns frozen at whatever point of its beat it
+    // was at when it left the screen.
+    organ.beat.scale.setScalar(1);
     organ.meshes.forEach((mesh) => {
       this.forEachMaterial(mesh, (material) => {
         material.transparent = false;
