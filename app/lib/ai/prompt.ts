@@ -171,6 +171,16 @@ export function systemPrompt(context: AskContext): string {
   ].join("\n");
 }
 
+/**
+ * The organs whose names take a plural verb.
+ *
+ * Listed explicitly rather than detected from a trailing "s", because "Pancreas"
+ * ends in one and is singular — a heuristic gets that wrong and ships "What do
+ * the pancreas do?" to a child who is learning to read. Nine hand-authored
+ * organs make an exact list cheaper than a clever rule.
+ */
+const PLURAL_ORGANS = new Set<OrganId>(["lungs", "kidneys"]);
+
 /** Follow-ups offered as buttons, so a child who cannot type still has a way in. */
 export function suggestedQuestions(context: AskContext): string[] {
   const organ = organById[context.organId];
@@ -185,9 +195,10 @@ export function suggestedQuestions(context: AskContext): string[] {
       ];
     }
   }
+  const plural = PLURAL_ORGANS.has(context.organId);
   return [
-    `What does the ${name} do?`,
-    `Why is the ${name} that shape?`,
+    `What ${plural ? "do" : "does"} the ${name} do?`,
+    `Why ${plural ? "are" : "is"} the ${name} that shape?`,
     `What would happen without the ${name}?`,
   ];
 }

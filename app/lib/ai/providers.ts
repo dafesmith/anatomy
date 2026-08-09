@@ -1,6 +1,9 @@
-import { organById } from "../anatomy-data";
-import { organReadings } from "../kid-readings";
-import { MAX_ANSWER_WORDS, systemPrompt, type AskContext, type Turn } from "./prompt";
+// `.ts` extensions here for the same reason as in `prompt.ts`: the test suite
+// imports this module directly and Node's TypeScript loader cannot resolve an
+// extensionless relative specifier at runtime.
+import { organById } from "../anatomy-data.ts";
+import { organReadings } from "../kid-readings.ts";
+import { MAX_ANSWER_WORDS, systemPrompt, type AskContext, type Turn } from "./prompt.ts";
 
 export type AskResult = { answer: string; needsGrownUp: boolean };
 
@@ -40,6 +43,22 @@ function parseResult(raw: string): AskResult {
   return cleaned
     ? { answer: cleaned, needsGrownUp: true }
     : { answer: "I didn't quite catch that. Try asking again?", needsGrownUp: false };
+}
+
+/**
+ * Strips credentials out of an upstream error body before it is logged.
+ *
+ * Two passes, because neither alone is enough: the exact key catches a provider
+ * that echoes it verbatim, and the generic pattern catches the partially-masked
+ * forms (`sk-proj-abc***xyz`) and any other bearer token that happens to be in
+ * the body. Truncation happens after redaction, so a key cannot survive by
+ * sitting past the cut.
+ */
+function redact(body: string, apiKey?: string): string {
+  let safe = body;
+  if (apiKey) safe = safe.split(apiKey).join("[redacted]");
+  safe = safe.replace(/\b(sk|gsk|xai|pk)-[A-Za-z0-9_*-]{6,}/gi, "[redacted]");
+  return safe.slice(0, 200);
 }
 
 /** Trims a runaway answer at a sentence boundary rather than mid-word. */
@@ -99,9 +118,25 @@ export const stubProvider: AskProvider = {
 // URL, the model id, and the key.
 // ---------------------------------------------------------------------------
 
-type ChatConfig = { name: string; baseUrl: string; model: string; apiKey?: string };
+type ChatConfig = {
+  name: string;
+  baseUrl: string;
+  model: string;
+  apiKey?: string;
+  /**
+   * Which field caps the reply length.
+   *
+   * `max_tokens` is the original chat-completions spelling and still what the
+   * OpenAI-compatible providers accept. OpenAI's own gpt-5 series *rejects* it
+   * outright — `400 Unsupported parameter` — and requires
+   * `max_completion_tokens`. Sending the wrong one fails every single request,
+   * so this is set explicitly per provider rather than guessed from the model id,
+   * which would quietly break again the next time a family is renamed.
+   */
+  tokenParam?: "max_tokens" | "max_completion_tokens";
+};
 
-function chatProvider({ name, baseUrl, model, apiKey }: ChatConfig): AskProvider {
+function chatProvider({ name, baseUrl, model, apiKey, tokenParam = "max_tokens" }: ChatConfig): AskProvider {
   return {
     name,
     ready: !!apiKey,
@@ -130,11 +165,15 @@ function chatProvider({ name, baseUrl, model, apiKey }: ChatConfig): AskProvider
       const response = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
         method: "POST",
         headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model, messages, max_tokens: 400, stream: false }),
+        body: JSON.stringify({ model, messages, [tokenParam]: 400, stream: false }),
       });
 
       if (!response.ok) {
-        throw new Error(`${name}: ${response.status} ${(await response.text()).slice(0, 200)}`);
+        // The upstream body is echoed back so a misconfiguration is diagnosable,
+        // but it is scrubbed first: a 401 from OpenAI quotes the key it rejected,
+        // and this string ends up in `console.error` — which on a hosted platform
+        // means the log retention of whoever can open the dashboard.
+        throw new Error(`${name}: ${response.status} ${redact(await response.text(), apiKey)}`);
       }
 
       const payload = (await response.json()) as {
@@ -175,8 +214,13 @@ export function selectProvider(env: Env): AskProvider {
       return chatProvider({
         name: "openai",
         baseUrl: env.OPENAI_BASE_URL ?? "https://api.openai.com/v1",
-        model: env.ASK_MODEL ?? "gpt-5.6",
+        // A mini tier on purpose. The questions are short, the facts travel with
+        // every one of them, and the answer is capped at 60 words — none of which
+        // needs a frontier model. It is also multimodal, which the unlabelled-tap
+        // capture requires. `ASK_MODEL` overrides it without a code change.
+        model: env.ASK_MODEL ?? "gpt-5.4-mini",
         apiKey: env.OPENAI_API_KEY,
+        tokenParam: "max_completion_tokens",
       });
     default:
       return stubProvider;
