@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { organs } from "../app/lib/anatomy-data.ts";
-import { buildQuiz } from "../app/lib/quiz.ts";
+import { buildQuiz, quizSpeech } from "../app/lib/quiz.ts";
 import { hotspotReadings, organReadings, organDescription, hotspotReading } from "../app/lib/kid-readings.ts";
 
 test("every question has exactly one right answer among four", () => {
@@ -103,4 +103,65 @@ test("hotspot child wording is offered at child levels and withheld at original"
   assert.ok(covered, "expected the first organ to have at least one child line");
   assert.ok(hotspotReading(organ.id, covered.id, "simple"));
   assert.equal(hotspotReading(organ.id, covered.id, "original"), null);
+});
+
+test("read-aloud speaks the answers, not just the question", () => {
+  // Reading the prompt and stopping leaves a child who cannot read well knowing
+  // the question and unable to see the four answers — the whole reason they
+  // pressed the button.
+  const [organ] = organs;
+  const [question] = buildQuiz(organ, organs);
+  const spoken = quizSpeech(question, null);
+
+  assert.ok(spoken.startsWith(question.prompt), "the question should come first");
+  for (const option of question.options) {
+    assert.ok(spoken.includes(option), `option "${option}" was not spoken`);
+  }
+  // Numbered, so "number three" can be matched to the numeral on screen.
+  for (let i = 1; i <= question.options.length; i += 1) {
+    assert.ok(spoken.includes(`Number ${i}.`), `option ${i} was not numbered`);
+  }
+});
+
+test("the options are spoken in the order they appear", () => {
+  const [organ] = organs;
+  const [question] = buildQuiz(organ, organs);
+  const spoken = quizSpeech(question, null);
+  const positions = question.options.map((option) => spoken.indexOf(option));
+  assert.deepEqual(
+    positions,
+    [...positions].sort((a, b) => a - b),
+    "spoken order does not match on-screen order",
+  );
+});
+
+test("after answering it reads the outcome, the answer and the fact", () => {
+  const [organ] = organs;
+  const [question] = buildQuiz(organ, organs);
+  const answer = question.options[question.correctIndex];
+  const wrong = (question.correctIndex + 1) % question.options.length;
+
+  const right = quizSpeech(question, question.correctIndex);
+  assert.match(right, /That's right/);
+  assert.ok(right.includes(answer));
+  assert.ok(right.includes(question.note), "the extra fact was not read");
+
+  const missed = quizSpeech(question, wrong);
+  assert.match(missed, /Not this time/);
+  // Names which one was right, since "the answer is" alone helps nobody.
+  assert.ok(missed.includes(`number ${question.correctIndex + 1}`), "the right option was not named");
+  assert.ok(missed.includes(answer));
+  assert.ok(missed.includes(question.note));
+});
+
+test("every question in the atlas produces speech for all four states", () => {
+  for (const organ of organs) {
+    for (const question of buildQuiz(organ, organs)) {
+      for (const picked of [null, 0, 1, 2, 3]) {
+        const spoken = quizSpeech(question, picked);
+        assert.ok(spoken.length > 20, `${organ.id}: thin speech for picked=${picked}`);
+        assert.ok(!/undefined|null|NaN/.test(spoken), `${organ.id}: "${spoken}"`);
+      }
+    }
+  }
 });

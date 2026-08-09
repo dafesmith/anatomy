@@ -701,6 +701,7 @@ button.organ-card-image:focus-visible { outline: 2px solid #8b6fc4; outline-offs
   text-align: left;
   font: 500 14px/1.35 var(--font-serif), serif;
 }
+.quiz-option > span:not(.quiz-option-number) { flex: 1; }
 .quiz-option:hover:enabled { background: #fff; }
 .quiz-option:disabled { cursor: default; }
 .quiz-option.right { background: rgba(150,183,138,.16); border-color: #96b78a; color: #4f6b45; }
@@ -1465,3 +1466,21 @@ button.organ-card-image:focus-visible { outline: 2px solid #8b6fc4; outline-offs
   font: 500 17px/1.2 var(--font-serif), serif;
 }
 .sticker-section > p { margin: 0 0 14px; color: var(--ink-soft); font: 400 12.5px/1.5 var(--font-serif), serif; }
+
+/* Numbered answers, so read-aloud's "number three" can be pointed at. Hidden from
+   the accessibility tree: a screen reader already announces list position, and the
+   spoken numbering comes from `quizSpeech`. */
+.quiz-option-number {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: rgba(117,91,70,.1);
+  color: var(--ink-soft);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.quiz-option.right .quiz-option-number { background: rgba(150,183,138,.3); color: #435c3a; }
+.quiz-option.wrong .quiz-option-number { background: rgba(226,124,107,.26); color: #8f4a3e; }

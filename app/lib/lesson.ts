@@ -1,5 +1,6 @@
 import { pluralOrganIds, type Organ } from "./anatomy-data.ts";
 import { hotspotReading, organDescription, type ReadingLevel } from "./kid-readings.ts";
+import { clause, sentence } from "./prose.ts";
 
 /**
  * A lesson is a short guided sequence rather than a page of text.
@@ -81,21 +82,6 @@ function deconjugate(phrase: string, plural: boolean) {
       ? first.slice(0, -1)
       : first;
   return [stem, ...rest].join(" ");
-}
-
-/** Sentence-cases an atlas fragment so it can open a sentence of its own. */
-function sentence(text: string) {
-  const trimmed = text.trim();
-  const capitalised = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
-  return /[.!?]$/.test(capitalised) ? capitalised : `${capitalised}.`;
-}
-
-/** Lower-cases an atlas fragment so it can be dropped mid-sentence. */
-function clause(text: string) {
-  const trimmed = text.trim().replace(/[.]$/, "");
-  // Only the first word, and only if it is not a proper noun or an acronym —
-  // "Behind the sternum" should soften, "L of air" and "Vitamin D" should not.
-  return /^[A-Z][a-z]/.test(trimmed) ? trimmed.charAt(0).toLowerCase() + trimmed.slice(1) : trimmed;
 }
 
 /**

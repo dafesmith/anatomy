@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, Check, RotateCcw, Sparkles, Volume2, X } from "lucide-react";
-import { buildQuiz } from "../lib/quiz";
+import { buildQuiz, quizSpeech } from "../lib/quiz";
 import { organs, type Organ } from "../lib/anatomy-data";
 import type { ReadingLevel } from "../lib/kid-readings";
 import { useSpeech } from "../lib/use-speech";
@@ -101,8 +101,16 @@ export function QuizPanel({ organ, level, onClose }: Props) {
           <button
             type="button"
             className="speak-button"
-            aria-label={speakingId === "quiz" ? "Stop reading" : "Read the question aloud"}
-            onClick={() => speak("quiz", question.prompt)}
+            // The label changes with what there is to read: before answering that is
+            // the question and its four options, after it is the outcome and the fact.
+            aria-label={
+              speakingId === "quiz"
+                ? "Stop reading"
+                : picked === null
+                  ? "Read the question and answers aloud"
+                  : "Read the answer aloud"
+            }
+            onClick={() => speak("quiz", quizSpeech(question, picked))}
           >
             <Volume2 size={15} />
           </button>
@@ -121,6 +129,7 @@ export function QuizPanel({ organ, level, onClose }: Props) {
               onClick={() => choose(spot)}
               disabled={picked !== null}
             >
+              <span className="quiz-option-number" aria-hidden>{spot + 1}</span>
               <span>{option}</span>
               {picked !== null && isCorrect && <Check size={16} />}
               {picked !== null && !isCorrect && spot === picked && <X size={16} />}
