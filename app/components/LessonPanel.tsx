@@ -7,6 +7,7 @@ import type { ReadingLevel } from "../lib/kid-readings";
 import { buildLesson } from "../lib/lesson";
 import { LessonStage } from "./LessonStage";
 import { useSpeech } from "../lib/use-speech";
+import { useStickers } from "../lib/stickers-store";
 import { OrganArt } from "./OrganArt";
 
 type Props = {
@@ -27,10 +28,19 @@ export function LessonPanel({ organ, level, onTakeQuiz, onClose }: Props) {
   const steps = useMemo(() => buildLesson(organ, level), [organ, level]);
   const [index, setIndex] = useState(0);
   const { supported: canSpeak, speakingId, speak, stop } = useSpeech(level);
+  const { earn } = useStickers();
 
   const step = steps[index];
   const first = index === 0;
   const last = index === steps.length - 1;
+
+  // Reaching the final beat is what earns the sticker — not opening the lesson, and
+  // not answering anything right. Every child who works through it gets one, which
+  // is the point of having a base tier at all. Idempotent in the store, so arriving
+  // at the last beat twice is harmless.
+  useEffect(() => {
+    if (last) void earn(organ.id);
+  }, [last, organ.id, earn]);
 
   const move = useCallback(
     (delta: number) => {

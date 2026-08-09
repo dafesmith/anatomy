@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, type CSSProperties } from "react";
-import { ArrowRight, NotebookPen, Pencil, Trash2, X } from "lucide-react";
+import { ArrowRight, NotebookPen, Pencil, Sticker, Trash2, X } from "lucide-react";
 import { OrganArt } from "./OrganArt";
 import { useNotes } from "../lib/notes-store";
+import { useStickers } from "../lib/stickers-store";
+import { StickerShelf } from "./StickerShelf";
 import { organById, organs, type OrganId } from "../lib/anatomy-data";
 
 type Props = {
@@ -22,6 +24,8 @@ function formatStamp(updatedAt: number) {
 
 export function NotesView({ currentOrganId, onSelectOrgan }: Props) {
   const { notes, ready, add, update, remove } = useNotes();
+  const { shelf, loading: stickersLoading } = useStickers();
+  const stickersReady = !stickersLoading;
   const [target, setTarget] = useState<OrganId>(currentOrganId);
   const [draft, setDraft] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -52,6 +56,17 @@ export function NotesView({ currentOrganId, onSelectOrgan }: Props) {
           browser only — clearing site data removes them.
         </p>
       </header>
+
+      {/* Above the notes, because it is the thing a child came here to look at.
+          Every slot is a button to that organ, so an empty one is an invitation
+          rather than a reproach. */}
+      <section className="sticker-section" aria-label="Sticker shelf">
+        <h2>
+          <Sticker size={15} /> Your stickers
+        </h2>
+        <p>Finish an organ&rsquo;s lesson to collect its sticker. Get every quiz question right and it turns gold.</p>
+        {stickersReady && <StickerShelf shelf={shelf} onOpenOrgan={onSelectOrgan} />}
+      </section>
 
       <form
         className="note-composer"

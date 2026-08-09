@@ -1,11 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, Check, RotateCcw, Sparkles, Volume2, X } from "lucide-react";
 import { buildQuiz } from "../lib/quiz";
 import { organs, type Organ } from "../lib/anatomy-data";
 import type { ReadingLevel } from "../lib/kid-readings";
 import { useSpeech } from "../lib/use-speech";
+import { useStickers } from "../lib/stickers-store";
+import { Confetti } from "./Confetti";
 
 type Props = {
   organ: Organ;
@@ -18,15 +20,30 @@ export function QuizPanel({ organ, level, onClose }: Props) {
   const [index, setIndex] = useState(0);
   const [picked, setPicked] = useState<number | null>(null);
   const [score, setScore] = useState(0);
+  /** Incremented per right answer; the number is what fires a fresh burst. */
+  const [burst, setBurst] = useState(0);
   const { supported: canSpeak, speakingId, speak } = useSpeech(level);
+  const { shelf, recordQuiz } = useStickers();
 
   const question = questions[index];
   const done = index >= questions.length;
 
+  // Written once per run, when the last answer is in. Guarded by a ref rather than
+  // by `done` alone, because "Try again" sets `done` back to false and would
+  // otherwise let a second write through on the way past.
+  const recorded = useRef(false);
+  useEffect(() => {
+    if (!done || recorded.current) return;
+    recorded.current = true;
+    void recordQuiz(organ.id, score, questions.length);
+  }, [done, organ.id, questions.length, recordQuiz, score]);
+
   const choose = (option: number) => {
     if (picked !== null) return;
     setPicked(option);
-    if (option === question.correctIndex) setScore((current) => current + 1);
+    if (option !== question.correctIndex) return;
+    setScore((current) => current + 1);
+    setBurst((current) => current + 1);
   };
 
   const next = () => {
@@ -38,15 +55,22 @@ export function QuizPanel({ organ, level, onClose }: Props) {
     setPicked(null);
     setScore(0);
     setIndex(0);
+    recorded.current = false;
   };
 
   if (done) {
+    const perfect = score === questions.length;
+    const sticker = shelf.find((entry) => entry.organId === organ.id);
     return (
       <div className="quiz-done">
+        {/* One last burst for a clean sweep, on top of the per-answer ones. */}
+        {perfect && <Confetti burst={burst + 1000} />}
         <span className="quiz-score">{score} / {questions.length}</span>
         <p>
-          {score === questions.length
-            ? "Every one right. Try another organ!"
+          {perfect
+            ? sticker?.earned
+              ? "Every one right — your sticker just went gold!"
+              : "Every one right! Finish the lesson to collect the sticker."
             : score === 0
               ? "Tricky one. Have another go together."
               : "Nice work. Want to try again?"}
@@ -108,6 +132,7 @@ export function QuizPanel({ organ, level, onClose }: Props) {
       {/* Announced politely so a screen-reader user hears the outcome without
           losing their place in the option list. */}
       <div className="quiz-feedback" role="status" aria-live="polite">
+        {picked === question.correctIndex && <Confetti burst={burst} />}
         {picked !== null && (
           <>
             <strong>{correct ? "That's right!" : "Not this time."}</strong>
