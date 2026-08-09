@@ -38,7 +38,16 @@ import { useSpeech } from "../lib/use-speech";
 import { organDescription, type ReadingLevel } from "../lib/kid-readings";
 import { ReadingLevelPicker } from "./ReadingLevelPicker";
 import { QuizPanel } from "./QuizPanel";
-import { organById, organs, referenceIndex, systems, type Organ, type OrganId } from "../lib/anatomy-data";
+import { LessonPanel } from "./LessonPanel";
+import {
+  organById,
+  organs,
+  pluralOrganIds,
+  referenceIndex,
+  systems,
+  type Organ,
+  type OrganId,
+} from "../lib/anatomy-data";
 
 type Modal = "lesson" | "quiz" | "animation" | "system" | null;
 type View = "explore" | "systems" | "library" | "notes";
@@ -232,6 +241,7 @@ export function AnatomyApp() {
         </aside>
 
         <OrganViewer
+          covered={modal !== null || grownUpOpen}
           organ={organ}
           autoRotate={autoRotate}
           onAutoRotate={setAutoRotate}
@@ -415,7 +425,15 @@ export function AnatomyApp() {
       )}
 
       {grownUpOpen && <GrownUpSettings onClose={() => setGrownUpOpen(false)} />}
-      {modal && <LearningModal type={modal} organ={organ} level={level} onClose={() => setModal(null)} />}
+      {modal && (
+        <LearningModal
+          type={modal}
+          organ={organ}
+          level={level}
+          onOpen={setModal}
+          onClose={() => setModal(null)}
+        />
+      )}
       {mobileLibrary && <button className="drawer-backdrop" aria-label="Close library" onClick={() => setMobileLibrary(false)} />}
     </main>
   );
@@ -432,11 +450,14 @@ function LearningModal({
   type,
   organ,
   level,
+  onOpen,
   onClose,
 }: {
   type: Exclude<Modal, null>;
   organ: Organ;
   level: ReadingLevel;
+  /** Lets one view hand over to another — the lesson ends by offering the quiz. */
+  onOpen: (next: Exclude<Modal, null>) => void;
   onClose: () => void;
 }) {
   const dialogRef = useRef<HTMLElement>(null);
@@ -518,11 +539,32 @@ function LearningModal({
             </dl>
             <button className="lesson-button" onClick={onClose}>Continue exploring <ArrowRight size={16} /></button>
           </>
+        ) : type === "lesson" ? (
+          // Keyed so switching organ or reading level restarts the lesson rather
+          // than stranding the reader on a beat that no longer exists.
+          <LessonPanel
+            key={`${organ.id}-${level}`}
+            organ={organ}
+            level={level}
+            onTakeQuiz={() => onOpen("quiz")}
+            onClose={onClose}
+          />
         ) : (
           <>
-            <p>Follow the highlighted structures, rotate the specimen, and connect form with function. This short study moment is designed to build a durable mental model.</p>
-            <div className={`modal-demo ${type === "animation" ? "moving" : ""}`}><OrganArt organ={organ} asset="organ" alt={`${organName} illustration`} /></div>
-            <button className="lesson-button" onClick={onClose}>Continue exploring <ArrowRight size={16} /></button>
+            {/* Describes what this view actually is — a held, breathing look at the
+                illustration — rather than promising structures it does not
+                highlight. The lesson is where the guided walk-through lives. */}
+            <p>
+              Watch the {organName.toLowerCase()} drift and settle. Look at the shape of{" "}
+              {pluralOrganIds.has(organ.id) ? "them" : "it"}, then open the lesson to find out
+              what each part is for.
+            </p>
+            <div className="modal-demo moving">
+              <OrganArt organ={organ} asset="organ" alt={`${organName} illustration`} />
+            </div>
+            <button className="lesson-button" onClick={() => onOpen("lesson")}>
+              Start the lesson <ArrowRight size={16} />
+            </button>
           </>
         )}
       </section>

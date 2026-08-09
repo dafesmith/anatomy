@@ -310,6 +310,17 @@ export const organs: Organ[] = [
 
 export const organById = Object.fromEntries(organs.map((organ) => [organ.id, organ])) as Record<OrganId, Organ>;
 
+/**
+ * The organs whose names take a plural verb: "the lungs **are**", not "is".
+ *
+ * Listed rather than detected from a trailing "s", because "Pancreas" ends in one
+ * and is singular — a heuristic ships "What do the pancreas do?" to a child who
+ * is learning to read. It lives here, beside the names themselves, because three
+ * separate places generate sentences about organs and they must agree; adding a
+ * tenth organ means adding it here once.
+ */
+export const pluralOrganIds: ReadonlySet<OrganId> = new Set<OrganId>(["lungs", "kidneys"]);
+
 export type ReferenceKind = "condition" | "tissue" | "comparison";
 
 export type ReferenceEntry = {

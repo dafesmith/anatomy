@@ -28,6 +28,14 @@ type Props = {
   level: ReadingLevel;
   /** Off unless a grown-up allowed it, so no asking affordance appears at all. */
   askEnabled: boolean;
+  /**
+   * True while a full-screen overlay is covering this viewer.
+   *
+   * `IntersectionObserver` cannot see occlusion, so without this the model keeps
+   * rendering at full rate behind a modal — and the lesson mounts a second viewer
+   * on top, leaving two contexts drawing at once on a tablet for no benefit.
+   */
+  covered?: boolean;
   onAsk: (start: { hotspotId?: string; unlabelled?: boolean; image?: string }) => void;
 };
 
@@ -39,6 +47,7 @@ export function OrganViewer({
   onCompare,
   level,
   askEnabled,
+  covered = false,
   onAsk,
 }: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
@@ -140,6 +149,7 @@ export function OrganViewer({
   useEffect(() => stopSpeaking, [organ, stopSpeaking]);
 
   useEffect(() => viewerRef.current?.setAutoRotate(autoRotate), [autoRotate]);
+  useEffect(() => viewerRef.current?.setPaused(covered), [covered]);
 
   // The viewer drives the callout's position directly, so a spinning model
   // never costs a React render.

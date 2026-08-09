@@ -587,6 +587,99 @@ button.organ-card-image:focus-visible { outline: 2px solid #8b6fc4; outline-offs
 }
 .callout-speak:hover { background: rgba(142,109,197,.12); }
 
+/* Lesson stepper. Shares the quiz's progress-bar idiom so the two guided views
+   read as the same kind of thing, but the pips shrink as a lesson can run to
+   eleven beats where a quiz is always four. */
+.lesson-panel { text-align: left; }
+.lesson-progress { display: flex; gap: 4px; justify-content: center; }
+.lesson-progress i { flex: 1 1 0; max-width: 22px; height: 4px; border-radius: 99px; background: rgba(117,91,70,.16); }
+.lesson-progress i.past { background: #b9cfa9; }
+.lesson-progress i.here { background: var(--coral); }
+.lesson-count {
+  margin: 8px 0 12px;
+  text-align: center;
+  color: var(--ink-soft);
+  font-size: 11px;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+.lesson-beat-head { display: flex; align-items: flex-start; gap: 10px; }
+.lesson-beat-head h3 { margin: 0; flex: 1; font: 500 19px/1.3 var(--font-serif), serif; }
+.lesson-figure {
+  margin: 12px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 14px;
+  background: radial-gradient(circle at 42% 34%, #fff, rgba(247,238,226,.9));
+  overflow: hidden;
+}
+/* The square aspect belongs to the picture, not the whole figure — putting it on
+   the figure sized the caption inside the square and `overflow: hidden` then
+   clipped it off. The art is square, so this also stops the panel jumping in
+   height as the beats swap between the four illustrations, and gives the 3D stage
+   a stable box to size its canvas against. */
+.lesson-figure-visual { position: relative; width: 100%; max-width: 216px; aspect-ratio: 1; }
+.lesson-figure-visual > * { position: absolute; inset: 0; }
+.lesson-figure img { width: 100%; height: 100%; object-fit: contain; }
+
+/* The live model inside a lesson. Kept laid out when inactive rather than
+   `display: none`, so the canvas keeps its size and does not have to be re-fitted
+   every time the lesson returns to a 3D beat. */
+.lesson-stage { border-radius: 12px; overflow: hidden; }
+.lesson-stage[data-active="false"] { visibility: hidden; pointer-events: none; }
+.lesson-stage-canvas { width: 100%; height: 100%; }
+.lesson-stage-canvas canvas { display: block; width: 100% !important; height: 100% !important; touch-action: none; cursor: grab; }
+.lesson-stage-canvas canvas:active { cursor: grabbing; }
+.lesson-stage-loading {
+  position: absolute;
+  inset: auto 0 10px;
+  text-align: center;
+  color: var(--ink-soft);
+  font-size: 11px;
+  letter-spacing: .05em;
+}
+.lesson-figure figcaption {
+  padding: 0 10px 9px;
+  color: var(--ink-soft);
+  font-size: 11px;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+.lesson-body { margin: 0; font: 400 15px/1.55 var(--font-serif), serif; }
+.lesson-actions { margin-top: 16px; display: flex; align-items: center; gap: 10px; }
+.lesson-actions .lesson-button { flex: 1; margin-top: 0; justify-content: center; gap: 8px; }
+.lesson-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255,255,255,.55);
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-size: 12px;
+}
+.lesson-back:hover:enabled { background: #fff; color: var(--ink); }
+.lesson-back:disabled { opacity: .38; cursor: default; }
+.lesson-skip {
+  width: 100%;
+  margin-top: 10px;
+  padding: 6px;
+  border: 0;
+  background: none;
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+/* A seven-year-old is reading this one aloud with a grown-up. */
+.app-shell[data-reading="simple"] .lesson-body { font-size: 16.5px; line-height: 1.62; }
+.app-shell[data-reading="simple"] .lesson-beat-head h3 { font-size: 20px; }
+
 .quiz-panel { text-align: left; }
 .quiz-progress { display: flex; gap: 5px; justify-content: center; margin-bottom: 16px; }
 .quiz-progress i { width: 22px; height: 4px; border-radius: 99px; background: rgba(117,91,70,.16); }

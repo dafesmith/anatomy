@@ -3,7 +3,7 @@
 // resolve an extensionless relative specifier at runtime. The bundler is happy
 // either way. The safety rules below are the most important thing in the app to
 // have covered by a test, which is worth this small inconsistency.
-import { organById, organs, type OrganId } from "../anatomy-data.ts";
+import { organById, organs, pluralOrganIds, type OrganId } from "../anatomy-data.ts";
 import { hotspotReadings, organReadings, type ReadingLevel } from "../kid-readings.ts";
 
 export type AskContext = {
@@ -171,16 +171,6 @@ export function systemPrompt(context: AskContext): string {
   ].join("\n");
 }
 
-/**
- * The organs whose names take a plural verb.
- *
- * Listed explicitly rather than detected from a trailing "s", because "Pancreas"
- * ends in one and is singular — a heuristic gets that wrong and ships "What do
- * the pancreas do?" to a child who is learning to read. Nine hand-authored
- * organs make an exact list cheaper than a clever rule.
- */
-const PLURAL_ORGANS = new Set<OrganId>(["lungs", "kidneys"]);
-
 /** Follow-ups offered as buttons, so a child who cannot type still has a way in. */
 export function suggestedQuestions(context: AskContext): string[] {
   const organ = organById[context.organId];
@@ -195,7 +185,7 @@ export function suggestedQuestions(context: AskContext): string[] {
       ];
     }
   }
-  const plural = PLURAL_ORGANS.has(context.organId);
+  const plural = pluralOrganIds.has(context.organId);
   return [
     `What ${plural ? "do" : "does"} the ${name} do?`,
     `Why ${plural ? "are" : "is"} the ${name} that shape?`,

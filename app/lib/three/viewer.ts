@@ -23,6 +23,16 @@ const PLINTH_TOP = PLINTH_Y + 0.17;
  *  rather than an edge-on band across the background. */
 const HOME_CAMERA = { x: 0, y: 1.05, z: 8.2 };
 const HOME_TARGET = { x: 0, y: 0.02, z: 0 };
+/**
+ * How far up and down the camera may travel, as a polar angle from +Y.
+ *
+ * The organ stands on an opaque plinth, so below roughly horizontal there is
+ * nothing to look at but its underside. `MAX_POLAR` stops both the focus move and
+ * a dragging finger going under it; `MIN_POLAR` keeps the camera off the north
+ * pole, where the plinth fills the frame from the other direction.
+ */
+const MIN_POLAR = 0.45;
+const MAX_POLAR = 1.75;
 
 export class AnatomyViewer {
   private renderer: THREE.WebGLRenderer;
@@ -51,6 +61,8 @@ export class AnatomyViewer {
   private height = 1;
   private isVisible = true;
   private isPageVisible = true;
+  /** Set while a modal covers the viewer — see `setPaused`. */
+  private isCovered = false;
 
   // Render-on-demand bookkeeping: the loop only draws when something moved.
   private dirty = true;
@@ -112,6 +124,8 @@ export class AnatomyViewer {
     this.controls.enablePan = false;
     this.controls.minDistance = 4.8;
     this.controls.maxDistance = 12;
+    this.controls.minPolarAngle = MIN_POLAR;
+    this.controls.maxPolarAngle = MAX_POLAR;
     this.controls.autoRotate = true;
     this.controls.autoRotateSpeed = 0.65;
     this.controls.target.set(HOME_TARGET.x, HOME_TARGET.y, HOME_TARGET.z);
@@ -384,7 +398,7 @@ export class AnatomyViewer {
 
   private animate = () => {
     this.frame = requestAnimationFrame(this.animate);
-    if (!this.isVisible || !this.isPageVisible) return;
+    if (!this.isVisible || !this.isPageVisible || this.isCovered) return;
 
     const delta = Math.min(this.clock.getDelta(), 0.05);
     const now = performance.now();
@@ -503,6 +517,70 @@ export class AnatomyViewer {
 
   clearSelection() {
     this.select(null);
+  }
+
+  /**
+   * Orbits the camera round until the named dot faces the viewer, and selects it.
+   *
+   * Used by the lesson, which walks a child through one labelled part per step:
+   * naming the mitral valve while it is hidden round the back teaches nothing.
+   * Passing `null` releases the selection and lets auto-rotate resume.
+   *
+   * The dot's position is taken in world space rather than model space, so
+   * however far auto-rotate has already turned the model is accounted for and the
+   * camera travels the short way instead of snapping the model back to front.
+   */
+  focusHotspot(id: string | null) {
+    if (!id) {
+      this.select(null);
+      return;
+    }
+    const marker = this.hotspots.list.find((item) => item.hotspot.id === id);
+    const pivot = this.organ?.pivot;
+    if (!marker || !pivot) return;
+
+    this.select(id);
+    pivot.updateWorldMatrix(true, false);
+    const world = marker.anchor.clone().applyMatrix4(pivot.matrixWorld);
+    const outward = world.sub(this.controls.target);
+    // A dot sitting exactly on the axis gives no direction to orbit towards.
+    if (outward.lengthSq() < 1e-6) return;
+
+    // Keeps the existing distance so a child who has zoomed in stays zoomed in,
+    // clamped to the range the keyboard zoom already uses.
+    const distance = Math.min(12, Math.max(4.8, this.camera.position.distanceTo(this.controls.target)));
+
+    // Aiming straight along the dot's outward direction is wrong for anything set
+    // low on the model: the mitral valve sits at y −1.35, which put the camera at
+    // roughly y −7.7 — under the plinth, looking up at its underside, so the whole
+    // frame went an opaque brown. Clamping the polar angle keeps the camera in the
+    // band where there is something to see; the azimuth, which is what actually
+    // brings the dot round to the front, is left exactly as it was.
+    const spherical = new THREE.Spherical().setFromVector3(outward);
+    spherical.phi = THREE.MathUtils.clamp(spherical.phi, MIN_POLAR, MAX_POLAR);
+    spherical.radius = distance;
+    const destination = new THREE.Vector3().setFromSpherical(spherical).add(this.controls.target);
+    this.tween(this.camera.position, {
+      x: destination.x,
+      y: destination.y,
+      z: destination.z,
+      duration: 0.85,
+      ease: "power3.out",
+    });
+  }
+
+  /**
+   * Stops the render loop while something is covering the viewer.
+   *
+   * `IntersectionObserver` only knows about the viewport, not about occlusion, so
+   * a full-screen modal leaves this viewer rendering at full rate behind it —
+   * invisible, and on a tablet competing for the GPU with the viewer *inside* the
+   * modal. Nothing here is torn down: the context, the loaded model and the camera
+   * are all still warm when the modal closes.
+   */
+  setPaused(paused: boolean) {
+    this.isCovered = paused;
+    if (!paused) this.dirty = true;
   }
 
   /**
