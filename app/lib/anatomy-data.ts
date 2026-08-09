@@ -162,6 +162,13 @@ export const organs: Organ[] = [
       { id: "right-lobe", label: "Right Lobe", detail: "Largest hepatic lobe", position: [-0.75, 0.35, 0.75], color: "#ee7c6a" },
       { id: "left-lobe", label: "Left Lobe", detail: "Crosses the midline", position: [0.85, 0.25, 0.75], color: "#f2a33b" },
       { id: "portal", label: "Portal Vein", detail: "Nutrient-rich inflow", position: [0.1, -0.3, 0.82], color: "#6393d8" },
+      // Green because bile is green — the convention children meet in every
+      // anatomy book, and the reason they ask about the green bit in the first
+      // place. It sits in a hollow on the underside of the right lobe, which is
+      // where this is aimed: the model paints a green structure deep inside, but
+      // that paint is decorative (one unnamed Tripo mesh, no named parts), so the
+      // dot is placed from anatomy rather than from the texture.
+      { id: "gallbladder", label: "Gallbladder", detail: "Stores and concentrates bile", position: [-0.3, -0.85, 0.6], color: "#96b78a" },
     ],
   },
   {

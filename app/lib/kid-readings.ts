@@ -104,6 +104,7 @@ export const hotspotReadings: Record<string, string> = {
   "liver:right-lobe": "The biggest part of your liver",
   "liver:left-lobe": "The part that reaches across your middle",
   "liver:portal": "The tube that brings in goodness from your food",
+  "liver:gallbladder": "A little green bag that keeps the bile your liver makes",
 
   // Kidneys
   "kidneys:cortex": "The outside layer, where the cleaning happens",
