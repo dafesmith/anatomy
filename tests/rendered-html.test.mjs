@@ -51,8 +51,9 @@ test("server-renders the Look Inside document head", async () => {
   assert.match(html, /<html lang="en"/);
   assert.match(
     html,
-    // The apostrophe arrives HTML-escaped, which is why this is not a literal one.
-    /<title>Look Inside — See what&#x27;s really in there<\/title>/,
+    // A curly apostrophe, matching the wordmark — JSX needs `&rsquo;` there, and a
+    // straight quote here would render the same tagline two different ways.
+    /<title>Look Inside — See what’s really in there<\/title>/,
   );
   assert.match(
     html,
@@ -60,7 +61,7 @@ test("server-renders the Look Inside document head", async () => {
   );
   assert.match(
     html,
-    /<meta property="og:title" content="Look Inside — See what&#x27;s really in there"\/>/,
+    /<meta property="og:title" content="Look Inside — See what’s really in there"\/>/,
   );
 });
 
@@ -72,7 +73,7 @@ test("server-renders the app shell rather than an empty root", async () => {
   assert.match(html, /<main class="app-shell"[^>]*>/);
   assert.match(html, /<header class="topbar"[^>]*>/);
   assert.match(html, /<strong>Look Inside/);
-  assert.match(html, /<em>See what&#x27;s really in there<\/em>/);
+  assert.match(html, /<em>See what’s really in there<\/em>/);
   assert.match(html, /<div class="workspace"[^>]*>/);
 });
 

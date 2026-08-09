@@ -34,7 +34,7 @@ const siteUrl =
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: "Look Inside — See what's really in there",
+  title: "Look Inside — See what’s really in there",
   description:
     "Explore the human body in 3D, together — heart, brain, lungs, liver, kidneys, eye, intestine, pancreas and skin. Turn each one around, hear it working, and read about it in words that suit a younger or an older reader.",
   applicationName: "Look Inside",
@@ -51,14 +51,14 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: "Look Inside",
-    title: "Look Inside — See what's really in there",
+    title: "Look Inside — See what’s really in there",
     description:
       "Explore the human body in 3D, together. Nine organs you can turn, listen to and label, with wording for younger and older readers.",
     images: [OG_IMAGE],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Look Inside — See what's really in there",
+    title: "Look Inside — See what’s really in there",
     description:
       "Explore the human body in 3D, together. Nine organs you can turn, listen to and label, with wording for younger and older readers.",
     images: [OG_IMAGE],
