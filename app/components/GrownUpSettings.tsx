@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Lock, LockOpen, ShieldAlert, X } from "lucide-react";
+import { Lock, LockOpen, ShieldAlert, SlidersHorizontal, X } from "lucide-react";
 import { pinAvailable, useParentLock } from "../lib/parent-lock-store";
+import { VoicePicker } from "./VoicePicker";
 
 type Props = { onClose: () => void };
 
@@ -57,11 +58,25 @@ export function GrownUpSettings({ onClose }: Props) {
         onMouseDown={(event) => event.stopPropagation()}
       >
         <button className="modal-close" onClick={onClose} aria-label="Close"><X size={18} /></button>
-        <span className="modal-icon">{unlocked ? <LockOpen size={22} /> : <Lock size={22} />}</span>
-        <em>Grown-ups only</em>
-        <h2 id="grownup-title">Settings for parents</h2>
+        {/* Sliders rather than a padlock: only the lower half of this panel is
+            locked now, and a padlock at the top implies the whole thing is. */}
+        <span className="modal-icon"><SlidersHorizontal size={22} /></span>
+        <em>Preferences</em>
+        <h2 id="grownup-title">Settings</h2>
 
-        <div ref={panelRef}>
+        {/* Ahead of the PIN, deliberately. Choosing a voice you can bear listening
+            to is not a parental control, and a child using read-aloud should not
+            have to fetch a grown-up to change it. Only what follows the lock is
+            actually gated. */}
+        <section className="settings-group">
+          <h3>Reading aloud</h3>
+          <VoicePicker />
+        </section>
+
+        <div className="settings-group settings-group-locked" ref={panelRef}>
+          <h3>
+            {unlocked ? <LockOpen size={13} /> : <Lock size={13} />} Grown-ups only
+          </h3>
           {!supported ? (
             <p className="grownup-note">
               This browser can’t store a PIN securely, so the settings below stay at their safe

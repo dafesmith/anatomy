@@ -1138,7 +1138,7 @@ button.organ-card-image:focus-visible { outline: 2px solid #8b6fc4; outline-offs
   /* The reading picker, the description row, the grown-up reveal and the facts
      heading are all new wrappers around what used to be bare children — they
      have to be named here or the grid auto-places them into column 1. */
-  .info-panel .reading-row, .info-panel .voice-picker,
+  .info-panel .reading-row,
   .info-panel .description-row, .info-panel .grown-up-copy,
   .info-panel .rule, .info-panel .facts-heading, .key-facts, .medical-note { grid-column: 2; }
   .info-kicker, .info-title-row { grid-column: 1; }
@@ -1267,3 +1267,27 @@ button.organ-card-image:focus-visible { outline: 2px solid #8b6fc4; outline-offs
      two pills on a phone. */
   .organ-sound { right: 14px; bottom: 56px; }
 }
+
+/* Settings panel, split into an open section and a locked one. */
+.settings-group { text-align: left; margin-top: 18px; }
+.settings-group h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font: 500 10px/1 var(--font-sans, inherit);
+  text-transform: uppercase;
+  letter-spacing: .12em;
+}
+/* The lock belongs to this heading, not to the panel — everything above it is
+   open to a child. */
+.settings-group-locked { margin-top: 24px; }
+.settings-note { margin: 0; color: var(--muted); font: 500 11px/1.5 var(--font-serif), serif; }
+/* In the panel the voice row has room to breathe, unlike the info panel it came
+   from where it was squeezed under the reading level. */
+.grown-up-panel .voice-picker { margin: 0; }
+.grown-up-panel .voice-picker label { gap: 12px; }
+.grown-up-panel .voice-picker select { flex: 1; }
