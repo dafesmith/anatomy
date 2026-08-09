@@ -853,20 +853,97 @@ button.organ-card-image:focus-visible { outline: 2px solid #8b6fc4; outline-offs
   font: 500 11px var(--font-serif), serif;
 }
 /* Sits at the tap point, so it reads as "this thing you just touched". */
-.bare-tap-ask {
+/* The two things a bare tap can become. Stacked rather than side by side, so the
+   pair never runs off the edge of the canvas when the tap was near one. */
+.bare-tap {
   position: absolute;
   z-index: 8;
   transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  animation: callout-in .2s ease-out;
+}
+.bare-tap button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   padding: 7px 12px;
   border: 1px solid rgba(215,112,91,.34);
   border-radius: 99px;
   background: rgba(255,251,245,.96);
   color: #b4614f;
   cursor: pointer;
+  white-space: nowrap;
   font: 500 11px var(--font-serif), serif;
   box-shadow: 0 6px 18px rgba(87,62,43,.16);
+}
+.bare-tap button:hover { background: #fff; }
+
+/* Writing a label. Anchored at the tap like the prompt it replaces, so the words
+   appear where the child was already looking. */
+.label-composer {
+  position: absolute;
+  z-index: 9;
+  transform: translate(-50%, -50%);
+  width: 186px;
+  padding: 11px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: rgba(255,252,248,.98);
+  box-shadow: 0 12px 30px rgba(87,62,43,.2);
   animation: callout-in .2s ease-out;
 }
+.label-composer input {
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  font: 500 12px var(--font-serif), serif;
+}
+.label-colours { display: flex; gap: 6px; margin: 9px 0; }
+.label-colours button {
+  width: 20px;
+  height: 20px;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  /* The ring sits outside the swatch so the colour itself is never covered. */
+  box-shadow: 0 0 0 1px rgba(94,66,52,.16);
+}
+.label-colours button.chosen { border-color: #fff; box-shadow: 0 0 0 2px var(--ink-soft); }
+.label-actions { display: flex; gap: 6px; }
+.label-actions button {
+  flex: 1;
+  min-height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255,255,255,.7);
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-size: 11px;
+}
+.label-actions button[type="submit"] { border-color: transparent; background: var(--coral, #ed8a72); color: #fff; }
+.label-actions button[type="submit"]:disabled { opacity: .45; cursor: not-allowed; }
+
+/* Removing one of your own labels, in the callout where "Tell me more" sits for
+   the atlas's dots. */
+.callout-delete {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+  padding: 5px 9px;
+  border: 1px solid rgba(164,87,74,.3);
+  border-radius: 99px;
+  background: rgba(255,255,255,.7);
+  color: #a4574a;
+  cursor: pointer;
+  font: 500 10.5px var(--font-serif), serif;
+}
+.callout-delete:hover { background: #fff; }
 
 /* ---- Grown-up settings -------------------------------------------------- */
 .grown-up-panel { text-align: left; }

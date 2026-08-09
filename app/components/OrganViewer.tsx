@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Box,
   CircleDashed,
@@ -11,6 +11,8 @@ import {
   Search,
   Sparkles,
   Square,
+  Tag,
+  Trash2,
   Volume2,
   VolumeX,
   X,
@@ -20,6 +22,13 @@ import { hotspotReading, type ReadingLevel } from "../lib/kid-readings";
 import { useSpeech } from "../lib/use-speech";
 import { organMotion } from "../lib/organ-motion";
 import { OrganSound, useOrganSound } from "../lib/organ-sound";
+import {
+  isOwnLabelId,
+  LABEL_COLOURS,
+  MAX_LABEL_LENGTH,
+  ownLabelsAsHotspots,
+  useOwnLabels,
+} from "../lib/labels-store";
 import type { AnatomyViewer } from "../lib/three/viewer";
 
 type Props = {
@@ -63,14 +72,30 @@ export function OrganViewer({
   const [slowLoad, setSlowLoad] = useState(false);
   const [activeTool, setActiveTool] = useState<string | null>(null);
   /** Where a tap landed that hit no label — the prompt for "what's this bit?". */
-  const [bareTap, setBareTap] = useState<{ x: number; y: number } | null>(null);
+  const [bareTap, setBareTap] = useState<{ x: number; y: number; at: [number, number, number] | null } | null>(null);
+  /** Open composer for a label the child is writing, anchored at their tap. */
+  const [naming, setNaming] = useState<{ x: number; y: number; at: [number, number, number] } | null>(null);
+  const [labelDraft, setLabelDraft] = useState("");
+  const [labelColour, setLabelColour] = useState(LABEL_COLOURS[0]);
   const askEnabledRef = useRef(askEnabled);
   const soundRef = useRef<OrganSound | null>(null);
   const { enabled: soundOn, toggle: toggleSound } = useOrganSound();
+  const { labels: ownLabels, add: addLabel, remove: removeLabel } = useOwnLabels();
   const soundOnRef = useRef(soundOn);
   const organKindRef = useRef(organMotion(organ.id).kind);
   const { supported: canSpeak, speakingId, speak, stop: stopSpeaking } = useSpeech(level);
-  const kidLine = selected ? hotspotReading(organ.id, selected.id, level) : null;
+  // The atlas's dots and the child's own, as one list. Handing them to the viewer
+  // together is what makes a label fade when it rotates away, be tappable, and open
+  // a callout — all on the path that already existed.
+  const allHotspots = useMemo(
+    () => [...organ.hotspots, ...ownLabelsAsHotspots(ownLabels, organ.id)],
+    [organ, ownLabels],
+  );
+  const hotspotsRef = useRef(allHotspots);
+
+  const selectedIsOwn = selected ? isOwnLabelId(selected.id) : false;
+  // A child's own label has no anatomical wording to sit beneath it.
+  const kidLine = selected && !selectedIsOwn ? hotspotReading(organ.id, selected.id, level) : null;
   // Keyed per hotspot so re-opening a different dot doesn't inherit the previous
   // dot's speaking state.
   const calloutSpeechId = selected ? `callout:${organ.id}:${selected.id}` : "callout";
@@ -92,6 +117,10 @@ export function OrganViewer({
     organRef.current = organ;
     organKindRef.current = organMotion(organ.id).kind;
   }, [organ]);
+
+  useEffect(() => {
+    hotspotsRef.current = allHotspots;
+  }, [allHotspots]);
 
   useEffect(() => {
     soundOnRef.current = soundOn;
@@ -136,7 +165,12 @@ export function OrganViewer({
           if (isLoading) setSlowLoad(false);
         },
         onUnlabelledTap: (point) => {
-          if (askEnabledRef.current) setBareTap(point);
+          // Offered whether or not the AI is on: writing your own label is not an
+          // AI feature, and asking was off by default, so this prompt never
+          // appeared for most people. Gated on `at` instead — a tap that sailed
+          // past the organ into the background has nothing to label, and ringing
+          // empty paper for the model to look at was never useful either.
+          if (point.at) setBareTap(point);
         },
         onBeat: (strength) => {
           if (!soundOnRef.current) return;
@@ -158,7 +192,7 @@ export function OrganViewer({
       }
       viewer.setAutoRotate(autoRotateRef.current);
       const current = organRef.current;
-      viewer.setOrgan(current.model, current.hotspots, current.accent, organMotion(current.id)).catch(() => {
+      viewer.setOrgan(current.model, hotspotsRef.current, current.accent, organMotion(current.id)).catch(() => {
         setLoading(false);
         setProgress(0);
       });
@@ -174,11 +208,29 @@ export function OrganViewer({
   }, []);
 
   useEffect(() => {
-    viewerRef.current?.setOrgan(organ.model, organ.hotspots, organ.accent, organMotion(organ.id)).catch(() => {
+    viewerRef.current?.setOrgan(organ.model, hotspotsRef.current, organ.accent, organMotion(organ.id)).catch(() => {
       setLoading(false);
       setProgress(0);
     });
+    // Keyed on the organ alone on purpose: adding a label must not reload the
+    // model, which is what `setHotspots` below is for.
   }, [organ]);
+
+  // Adding or deleting a label re-attaches the dots in place. Going through
+  // `setOrgan` instead would replay the organ's entrance animation every time a
+  // child named something.
+  //
+  // Skipped on the render where the organ itself changed, because `setOrgan` above
+  // is already loading and this would otherwise hang the *new* organ's labels on
+  // the *old* organ's mesh for as long as that load takes.
+  const attachedFor = useRef(organ.id);
+  useEffect(() => {
+    if (attachedFor.current !== organ.id) {
+      attachedFor.current = organ.id;
+      return;
+    }
+    viewerRef.current?.setHotspots(allHotspots);
+  }, [allHotspots, organ.id]);
 
   // Switching organ drops the open callout, so its voice — and the Stop icon on
   // its button — have to go with it.
@@ -266,48 +318,132 @@ export function OrganViewer({
               <button
                 type="button"
                 className="callout-speak"
-                aria-label={speakingId === calloutSpeechId ? "Stop reading" : `Read about the ${selected.label.toLowerCase()} aloud`}
+                // "Read about the aorta aloud" works; "Read about the my blood goes
+                // here aloud" does not. A child's label is a phrase they wrote, not
+                // the name of a part, so it does not take an article.
+                aria-label={
+                  speakingId === calloutSpeechId
+                    ? "Stop reading"
+                    : selectedIsOwn
+                      ? "Read your label aloud"
+                      : `Read about the ${selected.label.toLowerCase()} aloud`
+                }
                 onClick={() => speak(calloutSpeechId, `${selected.label}. ${kidLine ?? selected.detail}`)}
               >
                 {speakingId === calloutSpeechId ? <Square size={13} /> : <Volume2 size={13} />}
               </button>
             )}
-            {askEnabled && (
+            {/* "Tell me more" would send a child's own label to the model, which has
+                never heard of it and would only be able to say so. Their labels get
+                a delete instead — the one thing they might actually want. */}
+            {selectedIsOwn ? (
               <button
                 type="button"
-                className="callout-ask"
-                onClick={() => onAsk({ hotspotId: selected.id })}
+                className="callout-delete"
+                onClick={() => {
+                  viewerRef.current?.clearSelection();
+                  void removeLabel(selected.id);
+                }}
               >
-                Tell me more
+                <Trash2 size={13} /> Remove my label
               </button>
+            ) : (
+              askEnabled && (
+                <button
+                  type="button"
+                  className="callout-ask"
+                  onClick={() => onAsk({ hotspotId: selected.id })}
+                >
+                  Tell me more
+                </button>
+              )
             )}
           </div>
         </div>
       )}
 
-      {/* A tap that found no label. The capture is taken here, at the moment of
-          the tap, because by the time the question is sent the organ may have
-          rotated and the ring would point at the wrong thing. */}
-      {askEnabled && bareTap && !selected && (
-        <button
-          type="button"
-          className="bare-tap-ask"
-          style={{ left: bareTap.x, top: bareTap.y }}
-          onClick={() => {
-            onAsk({
-              unlabelled: true,
-              image: viewerRef.current?.capture({ mark: bareTap }) ?? undefined,
-            });
-            setBareTap(null);
-          }}
-        >
-          What&rsquo;s this bit?
-        </button>
+      {/* A tap that landed on the organ but on no label. Two things it can become:
+          a question for the model, or a label of the child's own. The capture for
+          the question is taken here, at the moment of the tap, because by the time
+          it is sent the organ may have rotated and the ring would point at the
+          wrong thing. */}
+      {bareTap && !selected && !naming && (
+        <div className="bare-tap" style={{ left: bareTap.x, top: bareTap.y }}>
+          {askEnabled && (
+            <button
+              type="button"
+              onClick={() => {
+                onAsk({
+                  unlabelled: true,
+                  image: viewerRef.current?.capture({ mark: bareTap }) ?? undefined,
+                });
+                setBareTap(null);
+              }}
+            >
+              What&rsquo;s this bit?
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              // `at` is non-null for any tap that reaches here — see onUnlabelledTap.
+              if (bareTap.at) setNaming({ x: bareTap.x, y: bareTap.y, at: bareTap.at });
+              setLabelDraft("");
+              setBareTap(null);
+            }}
+          >
+            <Tag size={13} /> Name it yourself
+          </button>
+        </div>
       )}
 
-      {/* Screen-reader equivalent of the dots, which live in the canvas. */}
+      {naming && (
+        <form
+          className="label-composer"
+          style={{ left: naming.x, top: naming.y }}
+          onSubmit={(event) => {
+            event.preventDefault();
+            const text = labelDraft.trim();
+            if (!text) return;
+            void addLabel({ organId: organ.id, label: text, position: naming.at, color: labelColour });
+            setNaming(null);
+            setLabelDraft("");
+          }}
+        >
+          <input
+            value={labelDraft}
+            onChange={(event) => setLabelDraft(event.target.value)}
+            maxLength={MAX_LABEL_LENGTH}
+            placeholder="What is this bit?"
+            aria-label="Your label for this part"
+            autoFocus
+          />
+          <div className="label-colours" role="group" aria-label="Label colour">
+            {LABEL_COLOURS.map((colour) => (
+              <button
+                key={colour}
+                type="button"
+                className={colour === labelColour ? "chosen" : ""}
+                style={{ background: colour }}
+                aria-label={`Use this colour`}
+                aria-pressed={colour === labelColour}
+                onClick={() => setLabelColour(colour)}
+              />
+            ))}
+          </div>
+          <div className="label-actions">
+            <button type="button" onClick={() => setNaming(null)}>Cancel</button>
+            <button type="submit" disabled={!labelDraft.trim()}>Add</button>
+          </div>
+        </form>
+      )}
+
+      {/* Screen-reader equivalent of the dots, which live in the canvas. The
+          child's own labels are in here too — they are dots on the model exactly
+          like the atlas's, so leaving them out would hide them from the only
+          reading of this viewer that is not visual. */}
       <ul className="hotspot-index">
-        {organ.hotspots.map((hotspot) => (
+        {allHotspots.map((hotspot) => (
           <li key={hotspot.id}>{hotspot.label}: {hotspot.detail}</li>
         ))}
       </ul>
