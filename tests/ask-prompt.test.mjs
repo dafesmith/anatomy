@@ -84,6 +84,59 @@ test("an unlabelled tap tells the model a ringed picture is coming", () => {
   assert.ok(!systemPrompt(context()).match(/ringed/i));
 });
 
+// Words that say something about form. Deliberately a vocabulary rather than a
+// syntax rule: the point is that the wording describes the part, not that it was
+// punctuated a particular way. A shape clause written in some word not listed
+// here is a fine reason to add the word.
+//
+// Note what this can and cannot catch. It catches a detail that says nothing
+// whatever about form — which is exactly the failure that shipped. It cannot
+// judge whether the form is actually explained, so "Largest hepatic lobe" would
+// satisfy it on the word "largest" alone. Reviewing the clause is still a
+// person's job; this only stops a function-only detail reaching the button.
+//
+// "small" is deliberately absent: it would match "small-intestine" and pass a
+// hotspot that says nothing about shape.
+const FORM_WORDS = [
+  "thin", "thick", "flat", "flatter", "flattened", "wide", "wider", "narrow",
+  "long", "large", "larger", "largest", "broad", "fine", "finer", "deep", "deeply",
+  "soft", "stiff", "springy", "stretchy", "folded", "folds", "fold", "packed",
+  "layer", "layers", "shell", "sheet", "tube", "cable", "channel", "ring", "rings",
+  "flaps", "pocket", "dome", "domed", "dished", "cone", "cone-shaped", "pyramids",
+  "curve", "c-curve", "curled", "slanting", "tucked", "wall", "walls", "tiles",
+  "stacked", "splits", "branching", "woven", "moulded", "tapering", "narrowing",
+  "tip", "lobe", "lobes",
+];
+
+test("every tapped part can answer why it is that shape", () => {
+  // "Why is it that shape?" is offered as a button on every hotspot, and the model
+  // is allowed nothing but the facts below it. A detail that names a function and
+  // stops leaves the model honest but useless — the live answer for the mitral
+  // valve was "I don't know why it has that shape" on a button we put there
+  // ourselves. So the grounding for every hotspot has to say something about form.
+  for (const organ of organs) {
+    for (const hotspot of organ.hotspots) {
+      const grounding = hotspot.detail.toLowerCase();
+      assert.ok(
+        FORM_WORDS.some((word) => new RegExp(`\\b${word}\\b`).test(grounding)),
+        `${organ.id}:${hotspot.id} — "${hotspot.detail}" says what it does but not ` +
+          `why it is that shape, so the shape button dead-ends. Add a form clause, ` +
+          `or drop the button for this hotspot if there is no honest answer.`,
+      );
+    }
+  }
+});
+
+test("the shape clause travels with the question, not just the callout", () => {
+  // The callout renders `detail`; the model is sent it twice over — once in the
+  // list of tappable parts, once in the description of what is open on screen.
+  // Both paths matter, because a child can ask before or after opening a label.
+  const hotspot = organById.heart.hotspots.find((item) => item.id === "mitral");
+  assert.match(hotspot.detail, /flaps/, "the mitral valve should describe its two flaps");
+  assert.ok(organFacts(context({ organId: "heart" })).includes(hotspot.detail));
+  assert.ok(systemPrompt(context({ organId: "heart", hotspotId: "mitral" })).includes(hotspot.detail));
+});
+
 test("suggested questions name the part the child actually tapped", () => {
   const asked = suggestedQuestions(context({ organId: "heart", hotspotId: "mitral" }));
   assert.ok(asked.length >= 2);

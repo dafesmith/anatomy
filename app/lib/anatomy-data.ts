@@ -12,6 +12,18 @@ export type OrganId =
 export type Hotspot = {
   id: string;
   label: string;
+  /**
+   * What the part does, then — after an em dash — why it is shaped the way it is.
+   *
+   * The second clause is not decoration. The Ask panel offers every tapped hotspot
+   * a "Why is it that shape?" button, and the model may only use the facts it is
+   * given, so a detail that names a function and stops turns that button into an
+   * honest "I don't know". Function alone is enough only where the wording already
+   * accounts for the form — "Two lobes, room for the heart" does, and so carries
+   * no dash.
+   *
+   * Keep the clause to a few words: it renders in a 168px callout at 10px.
+   */
   detail: string;
   position: [number, number, number];
   color: string;
@@ -69,12 +81,12 @@ export const organs: Organ[] = [
     conditions: ["Coronary artery disease", "Arrhythmia", "Heart valve disorders", "Heart failure", "Cardiomyopathy", "Myocarditis", "Atrial fibrillation", "Congenital heart defects"],
     illustrated: true,
     hotspots: [
-      { id: "aorta", label: "Aorta", detail: "Main artery", position: [-0.35, 1.65, 0.55], color: "#ee7c6a" },
-      { id: "left-atrium", label: "Left Atrium", detail: "Receives oxygenated blood", position: [0.82, 0.65, 0.5], color: "#f2a33b" },
-      { id: "right-atrium", label: "Right Atrium", detail: "Receives venous blood", position: [-0.9, 0.35, 0.55], color: "#6393d8" },
-      { id: "left-ventricle", label: "Left Ventricle", detail: "Pumps to the body", position: [0.7, -0.75, 0.65], color: "#f2a33b" },
-      { id: "right-ventricle", label: "Right Ventricle", detail: "Pumps to the lungs", position: [-0.65, -0.68, 0.66], color: "#ee7c6a" },
-      { id: "mitral", label: "Mitral Valve", detail: "Prevents backflow", position: [0.18, -1.35, 0.48], color: "#d89bc4" },
+      { id: "aorta", label: "Aorta", detail: "Main artery — wide and springy to absorb each beat", position: [-0.35, 1.65, 0.55], color: "#ee7c6a" },
+      { id: "left-atrium", label: "Left Atrium", detail: "Receives oxygenated blood — thin walls for a short push", position: [0.82, 0.65, 0.5], color: "#f2a33b" },
+      { id: "right-atrium", label: "Right Atrium", detail: "Receives venous blood — thin walls for a short push", position: [-0.9, 0.35, 0.55], color: "#6393d8" },
+      { id: "left-ventricle", label: "Left Ventricle", detail: "Pumps to the body — the thickest wall, for the longest push", position: [0.7, -0.75, 0.65], color: "#f2a33b" },
+      { id: "right-ventricle", label: "Right Ventricle", detail: "Pumps to the lungs — a thinner wall for a shorter trip", position: [-0.65, -0.68, 0.66], color: "#ee7c6a" },
+      { id: "mitral", label: "Mitral Valve", detail: "Prevents backflow — two thin flaps the blood pushes shut", position: [0.18, -1.35, 0.48], color: "#d89bc4" },
     ],
   },
   {
@@ -100,10 +112,10 @@ export const organs: Organ[] = [
     conditions: ["Migraine", "Stroke", "Neurodegenerative disease", "Epilepsy", "Traumatic brain injury", "Meningitis", "Multiple sclerosis", "Brain aneurysm"],
     illustrated: true,
     hotspots: [
-      { id: "frontal", label: "Frontal Lobe", detail: "Planning & movement", position: [-0.7, 0.65, 0.8], color: "#ee7c6a" },
-      { id: "parietal", label: "Parietal Lobe", detail: "Sensory integration", position: [0.15, 1.1, 0.65], color: "#f2a33b" },
-      { id: "temporal", label: "Temporal Lobe", detail: "Memory & hearing", position: [0.75, -0.1, 0.82], color: "#6393d8" },
-      { id: "cerebellum", label: "Cerebellum", detail: "Balance & coordination", position: [0.72, -0.9, 0.55], color: "#d89bc4" },
+      { id: "frontal", label: "Frontal Lobe", detail: "Planning & movement — the largest lobe, folded to fit", position: [-0.7, 0.65, 0.8], color: "#ee7c6a" },
+      { id: "parietal", label: "Parietal Lobe", detail: "Sensory integration — folds pack in more cortex", position: [0.15, 1.1, 0.65], color: "#f2a33b" },
+      { id: "temporal", label: "Temporal Lobe", detail: "Memory & hearing — folded and tucked low, beside each ear", position: [0.75, -0.1, 0.82], color: "#6393d8" },
+      { id: "cerebellum", label: "Cerebellum", detail: "Balance & coordination — far finer folds, tightly packed", position: [0.72, -0.9, 0.55], color: "#d89bc4" },
     ],
   },
   {
@@ -129,11 +141,11 @@ export const organs: Organ[] = [
     conditions: ["Asthma", "COPD", "Pneumonia", "Pulmonary embolism", "Pulmonary fibrosis", "Bronchitis", "Cystic fibrosis", "Lung cancer"],
     illustrated: true,
     hotspots: [
-      { id: "trachea", label: "Trachea", detail: "Carries air to the lungs", position: [0, 1.6, 0.2], color: "#6393d8" },
-      { id: "right-lung", label: "Right Lung", detail: "Three lobes", position: [-1.2, 0.1, 0.7], color: "#ee7c6a" },
+      { id: "trachea", label: "Trachea", detail: "Carries air to the lungs — stiff rings hold the tube open", position: [0, 1.6, 0.2], color: "#6393d8" },
+      { id: "right-lung", label: "Right Lung", detail: "Three lobes — the larger side, since the heart leans left", position: [-1.2, 0.1, 0.7], color: "#ee7c6a" },
       { id: "left-lung", label: "Left Lung", detail: "Two lobes, room for the heart", position: [1.2, 0.1, 0.7], color: "#f2a33b" },
-      { id: "bronchus", label: "Bronchus", detail: "Branching airway", position: [-0.03, 0.3, 0.35], color: "#d89bc4" },
-      { id: "base", label: "Lung Base", detail: "Rests on the diaphragm", position: [-1.14, -1.2, 1], color: "#7fa88a" },
+      { id: "bronchus", label: "Bronchus", detail: "Branching airway — splits over and over to reach every corner", position: [-0.03, 0.3, 0.35], color: "#d89bc4" },
+      { id: "base", label: "Lung Base", detail: "Rests on the diaphragm — dished to match its dome", position: [-1.14, -1.2, 1], color: "#7fa88a" },
     ],
   },
   {
@@ -159,9 +171,9 @@ export const organs: Organ[] = [
     conditions: ["Fatty liver disease", "Hepatitis", "Cirrhosis", "Gallstones", "Haemochromatosis", "Liver cancer", "Autoimmune hepatitis", "Portal hypertension"],
     illustrated: true,
     hotspots: [
-      { id: "right-lobe", label: "Right Lobe", detail: "Largest hepatic lobe", position: [-0.75, 0.35, 0.75], color: "#ee7c6a" },
-      { id: "left-lobe", label: "Left Lobe", detail: "Crosses the midline", position: [0.85, 0.25, 0.75], color: "#f2a33b" },
-      { id: "portal", label: "Portal Vein", detail: "Nutrient-rich inflow", position: [0.1, -0.3, 0.82], color: "#6393d8" },
+      { id: "right-lobe", label: "Right Lobe", detail: "Largest hepatic lobe — domed to fit under the diaphragm", position: [-0.75, 0.35, 0.75], color: "#ee7c6a" },
+      { id: "left-lobe", label: "Left Lobe", detail: "Crosses the midline — flatter, moulded over the stomach", position: [0.85, 0.25, 0.75], color: "#f2a33b" },
+      { id: "portal", label: "Portal Vein", detail: "Nutrient-rich inflow — splits finer to reach every lobule", position: [0.1, -0.3, 0.82], color: "#6393d8" },
     ],
   },
   {
@@ -187,9 +199,9 @@ export const organs: Organ[] = [
     conditions: ["Kidney stones", "Chronic kidney disease", "Urinary infection", "Glomerulonephritis", "Polycystic kidney disease", "Renal hypertension", "Acute kidney injury", "Nephrotic syndrome"],
     illustrated: true,
     hotspots: [
-      { id: "cortex", label: "Renal Cortex", detail: "Outer filtering layer", position: [-0.9, 0.55, 0.7], color: "#ee7c6a" },
-      { id: "medulla", label: "Renal Medulla", detail: "Concentrates urine", position: [0.85, 0.2, 0.7], color: "#f2a33b" },
-      { id: "ureter", label: "Ureter", detail: "Carries urine", position: [0.4, -1.1, 0.5], color: "#6393d8" },
+      { id: "cortex", label: "Renal Cortex", detail: "Outer filtering layer — a shell of about a million filters", position: [-0.9, 0.55, 0.7], color: "#ee7c6a" },
+      { id: "medulla", label: "Renal Medulla", detail: "Concentrates urine — cone-shaped pyramids funnel it inwards", position: [0.85, 0.2, 0.7], color: "#f2a33b" },
+      { id: "ureter", label: "Ureter", detail: "Carries urine — a narrow muscular tube that squeezes it down", position: [0.4, -1.1, 0.5], color: "#6393d8" },
     ],
   },
   {
@@ -215,9 +227,9 @@ export const organs: Organ[] = [
     conditions: ["Myopia", "Cataract", "Glaucoma", "Macular degeneration", "Retinal detachment", "Dry eye disease", "Astigmatism", "Conjunctivitis"],
     illustrated: true,
     hotspots: [
-      { id: "cornea", label: "Cornea", detail: "Clear focusing surface", position: [-0.94, 0.05, 1.47], color: "#6393d8" },
-      { id: "iris", label: "Iris", detail: "Controls light entry", position: [-1.22, -0.53, 1.15], color: "#f2a33b" },
-      { id: "optic", label: "Optic Nerve", detail: "Carries visual signals", position: [1.61, -0.18, 0.54], color: "#d89bc4" },
+      { id: "cornea", label: "Cornea", detail: "Clear focusing surface — domed, so its curve bends the light", position: [-0.94, 0.05, 1.47], color: "#6393d8" },
+      { id: "iris", label: "Iris", detail: "Controls light entry — a muscle ring that narrows the pupil", position: [-1.22, -0.53, 1.15], color: "#f2a33b" },
+      { id: "optic", label: "Optic Nerve", detail: "Carries visual signals — a cable of about a million fibres", position: [1.61, -0.18, 0.54], color: "#d89bc4" },
     ],
   },
   {
@@ -243,9 +255,9 @@ export const organs: Organ[] = [
     conditions: ["Irritable bowel syndrome", "Inflammatory bowel disease", "Celiac disease", "Diverticulitis", "Intestinal obstruction", "Colorectal polyps", "Crohn's disease", "Lactose intolerance"],
     illustrated: true,
     hotspots: [
-      { id: "duodenum", label: "Duodenum", detail: "First small-intestine segment", position: [0.6, 0.8, 0.75], color: "#f2a33b" },
-      { id: "jejunum", label: "Jejunum", detail: "Major absorption region", position: [-0.45, 0.1, 0.82], color: "#ee7c6a" },
-      { id: "colon", label: "Colon", detail: "Reclaims water", position: [0.75, -0.55, 0.72], color: "#6393d8" },
+      { id: "duodenum", label: "Duodenum", detail: "First small-intestine segment — a C curled round the pancreas", position: [0.6, 0.8, 0.75], color: "#f2a33b" },
+      { id: "jejunum", label: "Jejunum", detail: "Major absorption region — long and deeply folded for surface", position: [-0.45, 0.1, 0.82], color: "#ee7c6a" },
+      { id: "colon", label: "Colon", detail: "Reclaims water — a wider tube, holding what is left for longer", position: [0.75, -0.55, 0.72], color: "#6393d8" },
     ],
   },
   {
@@ -271,10 +283,10 @@ export const organs: Organ[] = [
     conditions: ["Pancreatitis", "Type 1 diabetes", "Pancreatic cancer", "Type 2 diabetes", "Exocrine insufficiency", "Pancreatic cysts", "Gallstone pancreatitis", "Insulinoma"],
     illustrated: true,
     hotspots: [
-      { id: "head", label: "Head", detail: "Cradled by the duodenum", position: [-1.32, -0.36, 0.55], color: "#ee7c6a" },
-      { id: "body", label: "Body", detail: "Crosses the spine", position: [0.05, 0.25, 0.45], color: "#f2a33b" },
-      { id: "tail", label: "Tail", detail: "Reaches the spleen", position: [1.55, 0.3, 0.35], color: "#6393d8" },
-      { id: "duct", label: "Pancreatic Duct", detail: "Drains enzymes to the gut", position: [-0.61, 0.39, 0.5], color: "#d89bc4" },
+      { id: "head", label: "Head", detail: "Cradled by the duodenum — the broad end, filling its C-curve", position: [-1.32, -0.36, 0.55], color: "#ee7c6a" },
+      { id: "body", label: "Body", detail: "Crosses the spine — flattened between stomach and backbone", position: [0.05, 0.25, 0.45], color: "#f2a33b" },
+      { id: "tail", label: "Tail", detail: "Reaches the spleen — narrowing to a thin tip", position: [1.55, 0.3, 0.35], color: "#6393d8" },
+      { id: "duct", label: "Pancreatic Duct", detail: "Drains enzymes to the gut — one thin channel down its length", position: [-0.61, 0.39, 0.5], color: "#d89bc4" },
     ],
   },
   {
@@ -300,10 +312,10 @@ export const organs: Organ[] = [
     conditions: ["Eczema", "Psoriasis", "Melanoma", "Acne vulgaris", "Cellulitis", "Contact dermatitis", "Rosacea", "Vitiligo"],
     illustrated: true,
     hotspots: [
-      { id: "epidermis", label: "Epidermis", detail: "Outer protective layer", position: [-0.05, 0.88, 1.4], color: "#ee7c6a" },
-      { id: "dermis", label: "Dermis", detail: "Nerves, vessels & glands", position: [0.29, 0.05, 1.4], color: "#f2a33b" },
-      { id: "hypodermis", label: "Hypodermis", detail: "Fat and insulation", position: [-0.39, -1.15, 1.4], color: "#6393d8" },
-      { id: "follicle", label: "Hair Follicle", detail: "Anchors each hair", position: [0.89, -0.44, 1.4], color: "#d89bc4" },
+      { id: "epidermis", label: "Epidermis", detail: "Outer protective layer — flat cells stacked like tiles", position: [-0.05, 0.88, 1.4], color: "#ee7c6a" },
+      { id: "dermis", label: "Dermis", detail: "Nerves, vessels & glands — thick, woven from stretchy fibres", position: [0.29, 0.05, 1.4], color: "#f2a33b" },
+      { id: "hypodermis", label: "Hypodermis", detail: "Fat and insulation — a soft padded layer underneath", position: [-0.39, -1.15, 1.4], color: "#6393d8" },
+      { id: "follicle", label: "Hair Follicle", detail: "Anchors each hair — a narrow pocket slanting into the skin", position: [0.89, -0.44, 1.4], color: "#d89bc4" },
     ],
   },
 ];
