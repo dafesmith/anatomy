@@ -1,46 +1,13 @@
 import { organById, type OrganId } from "../../lib/anatomy-data";
 import { MAX_HISTORY_TURNS, type AskContext, type Turn } from "../../lib/ai/prompt";
-import { selectProvider } from "../../lib/ai/providers";
+import { selectProvider, stubProvider } from "../../lib/ai/providers";
+import { askIsMetered, selectLimiter } from "../../lib/ai/rate-limit";
 
 const MAX_QUESTION_CHARS = 300;
 /** A 512px JPEG capture lands around 30KB; this leaves headroom without
  *  letting a caller post arbitrary payloads to burn tokens. */
 const MAX_IMAGE_CHARS = 200_000;
 const LEVELS = ["simple", "standard", "original"] as const;
-
-/**
- * Requests per window, per caller. Deliberately tight: this endpoint spends money
- * and the site is public.
- */
-const WINDOW_MS = 60_000;
-const MAX_PER_WINDOW = 12;
-
-/**
- * ⚠️ In-memory, so it is per-isolate and resets on redeploy or cold start. That
- * makes it a speed bump against a casual loop, NOT protection against real abuse:
- * a distributed caller, or simply enough traffic to spin up several isolates,
- * walks straight past it.
- *
- * Real enforcement needs shared state — a KV or Durable Object binding, neither of
- * which exists in `.openai/hosting.json` yet — or a rate-limit rule in front of
- * the app. Until one of those is in place, treat spend as unbounded and keep the
- * provider on the stub in production.
- */
-const hits = new Map<string, number[]>();
-
-function rateLimited(key: string): boolean {
-  const now = Date.now();
-  const recent = (hits.get(key) ?? []).filter((at) => now - at < WINDOW_MS);
-  recent.push(now);
-  hits.set(key, recent);
-  // Bounded so a long-lived isolate can't accumulate keys without limit.
-  if (hits.size > 5_000) {
-    for (const [existing, times] of hits) {
-      if (times.every((at) => now - at >= WINDOW_MS)) hits.delete(existing);
-    }
-  }
-  return recent.length > MAX_PER_WINDOW;
-}
 
 function callerKey(request: Request): string {
   return (
@@ -51,13 +18,36 @@ function callerKey(request: Request): string {
 }
 
 /**
+ * Resolves the provider *and* whether it is safe to bill for it.
+ *
+ * A configured paid provider is downgraded to the stub when there is no shared
+ * rate limiter, because a per-isolate limit on a public URL is no limit at all.
+ * The reason travels with it so the panel and the logs can say which of the two
+ * things is missing — a key, or a limiter.
+ */
+function resolveAsk(env: Record<string, string | undefined>) {
+  const limiter = selectLimiter(env);
+  const provider = selectProvider(env);
+  if (provider.name === "stub") return { provider, limiter, note: null as string | null };
+
+  const metered = askIsMetered(env, limiter);
+  if (metered.ok) return { provider, limiter, note: null as string | null };
+  return { provider: stubProvider, limiter, note: metered.reason };
+}
+
+/**
  * Which provider is configured, so the panel can warn *before* a child asks
  * rather than after the first answer arrives. Returns no secrets — just a name
  * and whether it has credentials.
  */
 export async function GET() {
-  const provider = selectProvider(process.env as Record<string, string | undefined>);
-  return Response.json({ provider: provider.name, ready: provider.ready });
+  const { provider, limiter, note } = resolveAsk(process.env as Record<string, string | undefined>);
+  return Response.json({
+    provider: provider.name,
+    ready: provider.ready,
+    limiter: limiter.name,
+    ...(note ? { note } : {}),
+  });
 }
 
 type Body = {
@@ -76,7 +66,11 @@ function bad(message: string, status = 400) {
 }
 
 export async function POST(request: Request) {
-  if (rateLimited(callerKey(request))) {
+  const env = process.env as Record<string, string | undefined>;
+  const { provider, limiter, note } = resolveAsk(env);
+  if (note) console.warn("ask: serving the stub —", note);
+
+  if (await limiter.limited(callerKey(request))) {
     return Response.json(
       { error: "Slow down a moment — try again shortly." },
       { status: 429, headers: { "retry-after": "60" } },
@@ -149,8 +143,9 @@ export async function POST(request: Request) {
     tools,
   };
 
-  const provider = selectProvider(process.env as Record<string, string | undefined>);
-
+  // `provider` came from `resolveAsk` at the top of the request. Resolving it again
+  // here would call `selectProvider` directly and hand back the paid provider that
+  // the metering check had just downgraded.
   try {
     const result = await provider.ask({ context, history, question, image });
     return Response.json({ ...result, provider: provider.name });
