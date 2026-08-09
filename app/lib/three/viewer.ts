@@ -11,8 +11,13 @@ type ViewerCallbacks = {
   onSelect: (hotspot: Hotspot | null) => void;
   /** A tap that hit the organ but no labelled dot, in canvas CSS pixels. The
    *  35 hotspots cover a fraction of each model, so this is where "what's this
-   *  bit?" comes from — the app has no answer, which is the whole point. */
-  onUnlabelledTap?: (point: { x: number; y: number }) => void;
+   *  bit?" comes from — the app has no answer, which is the whole point.
+   *
+   *  `at` is the same spot in three dimensions, or null when the ray missed the
+   *  organ entirely and only hit the background. The screen point is what the
+   *  capture rings for the model to look at; the 3D point is where a label a child
+   *  writes gets pinned. */
+  onUnlabelledTap?: (point: { x: number; y: number; at: [number, number, number] | null }) => void;
   /** Fired at each audible moment of the idle rhythm — see `motionCues`. */
   onBeat?: (strength: number) => void;
 };
@@ -552,7 +557,13 @@ export class AnatomyViewer {
     this.select(marker && marker.hotspot.id !== this.selectedId ? marker.hotspot.id : null);
     // A miss used to only close the callout. Report it too, so an unlabelled spot
     // can become a question instead of a dead tap.
-    if (!marker) this.callbacks.onUnlabelledTap?.({ x: event.offsetX, y: event.offsetY });
+    if (!marker) {
+      this.callbacks.onUnlabelledTap?.({
+        x: event.offsetX,
+        y: event.offsetY,
+        at: this.pickSurface(event.offsetX, event.offsetY),
+      });
+    }
   };
 
   private onPointerLeave = () => {
@@ -619,6 +630,49 @@ export class AnatomyViewer {
 
   clearSelection() {
     this.select(null);
+  }
+
+  /**
+   * Replaces the dots without touching the model.
+   *
+   * Adding a label could go through `setOrgan`, but that reloads the organ and
+   * replays its entrance animation — the whole thing would shrink and spring back
+   * every time a child named something, which reads as the app losing its place.
+   *
+   * The selection is dropped because `attach` disposes every marker, so a
+   * `selectedId` held across the swap would point at a sprite that no longer
+   * exists and the callout would track a stale position.
+   */
+  setHotspots(hotspots: Hotspot[]) {
+    if (!this.organ) return;
+    this.select(null);
+    this.hotspots.attach(this.organ.beat, hotspots, this.organ.meshes);
+    this.hotspots.setPixelSize(DOT_PIXELS, this.height, CAMERA_FOV);
+    this.dirty = true;
+  }
+
+  /**
+   * Where on the organ a tap landed, in the space hotspot positions are authored in.
+   *
+   * The viewer never needed this before: `pick` only measures screen distance to
+   * dots that already exist, and the "what's this bit?" capture rings a point in a
+   * flat image. A label a child places has to stay stuck to the surface while the
+   * model turns, which means knowing the actual point in three dimensions.
+   *
+   * Returned in the beat group's local space, because that is where the hotspot
+   * layer lives and therefore what `snapToSurface` expects. Taking it in world
+   * space instead would bake in whatever rotation auto-rotate happened to be at,
+   * and the label would sit somewhere else the moment the model moved.
+   */
+  pickSurface(x: number, y: number): [number, number, number] | null {
+    if (!this.organ) return null;
+    const ndc = new THREE.Vector2((x / this.width) * 2 - 1, -(y / this.height) * 2 + 1);
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(ndc, this.camera);
+    const hit = raycaster.intersectObjects(this.organ.meshes, false)[0];
+    if (!hit) return null;
+    const local = this.organ.beat.worldToLocal(hit.point.clone());
+    return [local.x, local.y, local.z];
   }
 
   /**

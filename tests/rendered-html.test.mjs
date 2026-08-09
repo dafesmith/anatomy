@@ -46,20 +46,21 @@ test("serves the home page as HTML", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 });
 
-test("server-renders the Anatomy Atelier document head", async () => {
+test("server-renders the Look Inside document head", async () => {
   const { html } = await renderHome();
   assert.match(html, /<html lang="en"/);
   assert.match(
     html,
-    /<title>Anatomy Atelier — Learn anatomy like an artist<\/title>/,
+    // The apostrophe arrives HTML-escaped, which is why this is not a literal one.
+    /<title>Look Inside — See what&#x27;s really in there<\/title>/,
   );
   assert.match(
     html,
-    /<meta name="description" content="Explore medically detailed 3D organs/,
+    /<meta name="description" content="Explore the human body in 3D, together/,
   );
   assert.match(
     html,
-    /<meta property="og:title" content="Anatomy Atelier — Learn anatomy like an artist"\/>/,
+    /<meta property="og:title" content="Look Inside — See what&#x27;s really in there"\/>/,
   );
 });
 
@@ -70,8 +71,8 @@ test("server-renders the app shell rather than an empty root", async () => {
   const { html } = await renderHome();
   assert.match(html, /<main class="app-shell"[^>]*>/);
   assert.match(html, /<header class="topbar"[^>]*>/);
-  assert.match(html, /<strong>Anatomy Atelier/);
-  assert.match(html, /<em>Learn anatomy like an artist<\/em>/);
+  assert.match(html, /<strong>Look Inside/);
+  assert.match(html, /<em>See what&#x27;s really in there<\/em>/);
   assert.match(html, /<div class="workspace"[^>]*>/);
 });
 

@@ -1,4 +1,4 @@
-# Anatomy Atelier
+# Look Inside
 
 An interactive 3D anatomy atlas — nine organs as real glTF models you can orbit,
 section, and annotate, with hand-painted illustrations for every organ.

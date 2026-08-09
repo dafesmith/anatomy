@@ -340,7 +340,10 @@ export function OrganViewer({
       </button>
 
       <div className="view-caption">
-        <span>3D specimen · click a dot to explore</span>
+        {/* "Specimen" belonged to the old name and the old audience — it is a word
+            for something in a jar, not for the thing beating in front of a child.
+            The scientific name stays underneath, where a parent can still see it. */}
+        <span>Turn it around · tap a dot to find out more</span>
         <strong>{organ.scientificName}</strong>
       </div>
     </section>

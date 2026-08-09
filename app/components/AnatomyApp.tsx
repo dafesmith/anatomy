@@ -142,9 +142,9 @@ export function AnatomyApp() {
   return (
     <main className="app-shell" data-reading={level}>
       <header className="topbar">
-        <button className="brand" type="button" onClick={() => selectOrgan("heart")} aria-label="Anatomy Atelier home">
-          <strong>Anatomy Atelier<sup>✦</sup></strong>
-          <em>Learn anatomy like an artist</em>
+        <button className="brand" type="button" onClick={() => selectOrgan("heart")} aria-label="Look Inside home">
+          <strong>Look Inside<sup>✦</sup></strong>
+          <em>See what's really in there</em>
         </button>
         {/* Every label carries an aria-label as well as visible text: the
             narrow breakpoints hide the <span>, and hidden text is absent from
